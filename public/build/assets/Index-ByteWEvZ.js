@@ -1,1 +1,0 @@
-import{_ as r}from"./_plugin-vue_export-helper-DlAUqK2U.js";import{e as t,a as n,r as a}from"./app-Cul4giF2.js";const o={};function c(s,e){return a(),t("div",null,[...e[0]||(e[0]=[n("h1",null,"Can thiệp",-1),n("p",null,"Danh sách kế hoạch hiện tại của trẻ đang được hỗ trợ.",-1)])])}const f=r(o,[["render",c]]);export{f as default};

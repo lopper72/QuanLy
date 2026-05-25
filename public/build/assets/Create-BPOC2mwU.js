@@ -1,1 +1,0 @@
-import{I as r}from"./InterventionForm-Dr9U_Zel.js";import{e as t,a as o,i as a,r as n}from"./app-Cul4giF2.js";import"./_plugin-vue_export-helper-DlAUqK2U.js";const c={__name:"Create",setup(s){return(m,e)=>(n(),t("div",null,[e[0]||(e[0]=o("h1",null,"Tạo can thiệp",-1)),a(r)]))}};export{c as default};

@@ -1,1 +1,0 @@
-import{_ as e}from"./_plugin-vue_export-helper-DlAUqK2U.js";import{e as r,a as t,r as o}from"./app-Cul4giF2.js";const c={};function l(a,n){return o(),r("div",null,[...n[0]||(n[0]=[t("h1",null,"Buổi tập",-1),t("p",null,"Các buổi tập đã lên lịch và đã hoàn thành trong chương trình can thiệp.",-1)])])}const i=e(c,[["render",l]]);export{i as default};
