@@ -2,15 +2,15 @@
 
 namespace Database\Factories;
 
-use App\Models\TrainingSession;
 use App\Models\Child;
+use App\Models\TrainingSession;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class TrainingSessionFactory extends Factory
 {
     protected $model = TrainingSession::class;
 
-    public function definition()
+    public function definition(): array
     {
         $notes = [
             'Bé hợp tác tốt hơn khi có phần thưởng nhỏ.',
@@ -22,11 +22,26 @@ class TrainingSessionFactory extends Factory
 
         return [
             'child_id' => Child::factory(),
-            'session_date' => $this->faker->dateTimeBetween('-14 days', 'now')->format('Y-m-d'),
-            'scheduled_time' => $this->faker->optional(0.8)->randomElement(['07:00', '08:00', '09:00', '14:00', '15:30', '17:00', '20:00']),
-            'status' => $this->faker->randomElement(['planned', 'in_progress', 'completed', 'skipped']),
-            'total_minutes' => $this->faker->optional(0.6)->numberBetween(15, 90),
-            'notes' => $this->faker->optional()->randomElement($notes),
+            'session_date' => now()->subDays(random_int(0, 14))->format('Y-m-d'),
+            'scheduled_time' => $this->optionalValue(['07:00', '08:00', '09:00', '14:00', '15:30', '17:00', '20:00'], 80),
+            'status' => $this->randomValue(['planned', 'in_progress', 'completed', 'skipped']),
+            'total_minutes' => $this->optionalNumber(15, 90, 60),
+            'notes' => $this->optionalValue($notes, 60),
         ];
+    }
+
+    private function randomValue(array $values): mixed
+    {
+        return $values[array_rand($values)];
+    }
+
+    private function optionalValue(array $values, int $percent = 50): mixed
+    {
+        return random_int(1, 100) <= $percent ? $this->randomValue($values) : null;
+    }
+
+    private function optionalNumber(int $min, int $max, int $percent = 50): ?int
+    {
+        return random_int(1, 100) <= $percent ? random_int($min, $max) : null;
     }
 }

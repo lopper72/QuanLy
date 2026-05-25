@@ -2,15 +2,15 @@
 
 namespace Database\Factories;
 
-use App\Models\AssessmentItem;
 use App\Models\Assessment;
+use App\Models\AssessmentItem;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class AssessmentItemFactory extends Factory
 {
     protected $model = AssessmentItem::class;
 
-    public function definition()
+    public function definition(): array
     {
         $notes = [
             'Bé thực hiện tốt hơn khi có hình ảnh minh họa.',
@@ -22,7 +22,7 @@ class AssessmentItemFactory extends Factory
 
         return [
             'assessment_id' => Assessment::factory(),
-            'skill_name' => $this->faker->randomElement([
+            'skill_name' => $this->randomValue([
                 'communication',
                 'balance',
                 'fine_motor',
@@ -30,9 +30,24 @@ class AssessmentItemFactory extends Factory
                 'self_regulation',
                 'social_interaction',
             ]),
-            'score' => $this->faker->optional(0.8)->numberBetween(1, 5),
-            'level' => $this->faker->optional()->randomElement(['emerging', 'developing', 'achieved', 'regression']),
-            'note' => $this->faker->optional()->randomElement($notes),
+            'score' => $this->optionalNumber(1, 5, 80),
+            'level' => $this->optionalValue(['emerging', 'developing', 'achieved', 'regression'], 50),
+            'note' => $this->optionalValue($notes, 50),
         ];
+    }
+
+    private function randomValue(array $values): mixed
+    {
+        return $values[array_rand($values)];
+    }
+
+    private function optionalValue(array $values, int $percent = 50): mixed
+    {
+        return random_int(1, 100) <= $percent ? $this->randomValue($values) : null;
+    }
+
+    private function optionalNumber(int $min, int $max, int $percent = 50): ?int
+    {
+        return random_int(1, 100) <= $percent ? random_int($min, $max) : null;
     }
 }

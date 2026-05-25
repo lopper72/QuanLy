@@ -2,15 +2,15 @@
 
 namespace Database\Factories;
 
-use App\Models\Report;
 use App\Models\Child;
+use App\Models\Report;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class ReportFactory extends Factory
 {
     protected $model = Report::class;
 
-    public function definition()
+    public function definition(): array
     {
         $summaries = [
             'Tuần này bé hợp tác tốt hơn trong các hoạt động vận động và cần tiếp tục luyện giao tiếp mắt khi gọi tên.',
@@ -22,9 +22,19 @@ class ReportFactory extends Factory
 
         return [
             'child_id' => Child::factory(),
-            'report_type' => $this->faker->randomElement(['weekly_summary', 'progress_update', 'behavior_overview']),
-            'report_date' => $this->faker->dateTimeBetween('-30 days', 'now')->format('Y-m-d'),
-            'summary' => $this->faker->optional()->randomElement($summaries),
+            'report_type' => $this->randomValue(['weekly_summary', 'progress_update', 'behavior_overview']),
+            'report_date' => now()->subDays(random_int(0, 30))->format('Y-m-d'),
+            'summary' => $this->optionalValue($summaries, 50),
         ];
+    }
+
+    private function randomValue(array $values): mixed
+    {
+        return $values[array_rand($values)];
+    }
+
+    private function optionalValue(array $values, int $percent = 50): mixed
+    {
+        return random_int(1, 100) <= $percent ? $this->randomValue($values) : null;
     }
 }

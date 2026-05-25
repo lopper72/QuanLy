@@ -10,7 +10,7 @@ class AssessmentFactory extends Factory
 {
     protected $model = Assessment::class;
 
-    public function definition()
+    public function definition(): array
     {
         $notes = [
             'Bé duy trì chú ý tốt hơn khi hoạt động được chia thành bước ngắn.',
@@ -22,9 +22,24 @@ class AssessmentFactory extends Factory
 
         return [
             'child_id' => Child::factory(),
-            'assessment_date' => $this->faker->dateTimeBetween('-90 days', 'now')->format('Y-m-d'),
-            'overall_score' => $this->faker->optional(0.7)->numberBetween(40, 100),
-            'notes' => $this->faker->optional()->randomElement($notes),
+            'assessment_date' => now()->subDays(random_int(0, 90))->format('Y-m-d'),
+            'overall_score' => $this->optionalNumber(40, 100, 70),
+            'notes' => $this->optionalValue($notes, 50),
         ];
+    }
+
+    private function randomValue(array $values): mixed
+    {
+        return $values[array_rand($values)];
+    }
+
+    private function optionalValue(array $values, int $percent = 50): mixed
+    {
+        return random_int(1, 100) <= $percent ? $this->randomValue($values) : null;
+    }
+
+    private function optionalNumber(int $min, int $max, int $percent = 50): ?int
+    {
+        return random_int(1, 100) <= $percent ? random_int($min, $max) : null;
     }
 }

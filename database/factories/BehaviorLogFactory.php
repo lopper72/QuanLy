@@ -10,7 +10,7 @@ class BehaviorLogFactory extends Factory
 {
     protected $model = BehaviorLog::class;
 
-    public function definition()
+    public function definition(): array
     {
         $triggers = [
             'Bé phải chuyển sang hoạt động mới khi chưa sẵn sàng.',
@@ -38,18 +38,28 @@ class BehaviorLogFactory extends Factory
 
         return [
             'child_id' => Child::factory(),
-            'behavior_type' => $this->faker->randomElement([
+            'behavior_type' => $this->randomValue([
                 'aggression',
                 'withdrawal',
                 'hyperactivity',
                 'noncompliance',
                 'sensory_seeking',
             ]),
-            'severity' => $this->faker->randomElement(['low', 'medium', 'high']),
-            'trigger' => $this->faker->optional()->randomElement($triggers),
-            'response' => $this->faker->optional()->randomElement($responses),
-            'note' => $this->faker->optional()->randomElement($notes),
-            'recorded_at' => $this->faker->dateTimeBetween('-30 days', 'now'),
+            'severity' => $this->randomValue(['low', 'medium', 'high']),
+            'trigger' => $this->optionalValue($triggers, 50),
+            'response' => $this->optionalValue($responses, 50),
+            'note' => $this->optionalValue($notes, 50),
+            'recorded_at' => now()->subDays(random_int(0, 30))->subMinutes(random_int(0, 1440)),
         ];
+    }
+
+    private function randomValue(array $values): mixed
+    {
+        return $values[array_rand($values)];
+    }
+
+    private function optionalValue(array $values, int $percent = 50): mixed
+    {
+        return random_int(1, 100) <= $percent ? $this->randomValue($values) : null;
     }
 }
