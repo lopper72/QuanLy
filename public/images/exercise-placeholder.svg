@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480" role="img" aria-label="Ảnh minh họa bài tập">
+  <rect width="640" height="480" fill="#eef2ff"/>
+  <circle cx="430" cy="145" r="74" fill="#bfdbfe"/>
+  <circle cx="208" cy="176" r="52" fill="#a7f3d0"/>
+  <rect x="116" y="300" width="408" height="42" rx="21" fill="#c7d2fe"/>
+  <path d="M228 248c42-34 90-40 143-18 34 14 66 39 96 75" fill="none" stroke="#4f46e5" stroke-width="26" stroke-linecap="round"/>
+  <path d="M236 247l-34 72m152-86l-28 90m67-61l58 56" fill="none" stroke="#0f766e" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="238" cy="213" r="28" fill="#f59e0b"/>
+  <text x="320" y="405" text-anchor="middle" fill="#475569" font-family="Arial, sans-serif" font-size="28" font-weight="700">Bài tập can thiệp</text>
+</svg>

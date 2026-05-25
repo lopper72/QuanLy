@@ -1,0 +1,269 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\TelegramContact;
+use App\Models\TelegramMessage;
+use App\Models\TelegramSetting;
+use App\Models\Child;
+use App\Models\TrainingSession;
+use App\Services\TelegramService;
+use App\Services\TelegramTrainingNotificationService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class TelegramController extends Controller
+{
+    public function index(Request $request): Response
+    {
+        $selectedChatId = $request->string('chat_id')->toString()
+            ?: TelegramContact::query()->latest('last_seen_at')->value('telegram_chat_id');
+
+        return Inertia::render('Telegram/Index', [
+            'contacts' => $this->contactsPayload(),
+            'messages' => $this->messagesPayload($selectedChatId),
+            'selectedChatId' => $selectedChatId,
+            'settings' => $this->settingsPayload(),
+            'stats' => $this->statsPayload(),
+            'trainingTest' => $this->trainingTestPayload(),
+        ]);
+    }
+
+    public function settings(): Response
+    {
+        return Inertia::render('Telegram/Settings', [
+            'settings' => $this->settingsPayload(),
+        ]);
+    }
+
+    public function updateSettings(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'bot_token' => ['nullable', 'string', 'max:500'],
+            'bot_username' => ['nullable', 'string', 'max:255'],
+            'webhook_secret' => ['nullable', 'string', 'max:255'],
+            'default_chat_id' => ['nullable', 'string', 'max:255'],
+            'enabled' => ['boolean'],
+        ]);
+
+        $settings = TelegramSetting::current();
+        $settings->fill([
+            'bot_username' => $validated['bot_username'] ?? null,
+            'webhook_secret' => $validated['webhook_secret'] ?? null,
+            'default_chat_id' => $validated['default_chat_id'] ?? null,
+            'enabled' => (bool) ($validated['enabled'] ?? false),
+        ]);
+
+        if (filled($validated['bot_token'] ?? null)) {
+            $settings->bot_token = $validated['bot_token'];
+        }
+
+        $settings->save();
+
+        return back()->with('success', 'Đã lưu cấu hình Telegram.');
+    }
+
+    public function testSend(Request $request, TelegramService $telegramService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'chat_id' => ['required', 'string', 'max:255'],
+            'message_text' => ['required', 'string', 'max:4000'],
+        ]);
+
+        $telegramService->sendTestMessage($validated['chat_id'], $validated['message_text']);
+
+        return back()->with('success', 'Đã gửi tin nhắn thử nghiệm.');
+    }
+
+    public function messages(Request $request): JsonResponse
+    {
+        $selectedChatId = $request->string('chat_id')->toString();
+
+        return response()->json([
+            'contacts' => $this->contactsPayload(),
+            'messages' => $this->messagesPayload($selectedChatId),
+            'stats' => $this->statsPayload(),
+        ]);
+    }
+
+    public function webhookInfo(TelegramService $telegramService): JsonResponse
+    {
+        $response = $telegramService->getWebhookInfo();
+
+        if (!$response) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Chưa cấu hình bot Telegram.',
+            ], 422);
+        }
+
+        return response()->json([
+            'ok' => $response->successful(),
+            'status' => $response->status(),
+            'telegram' => $response->json(),
+        ]);
+    }
+
+    public function send(Request $request, TelegramService $telegramService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'chat_id' => ['required', 'string', 'max:255'],
+            'message_text' => ['required', 'string', 'max:4000'],
+        ]);
+
+        $telegramService->sendMessage($validated['chat_id'], $validated['message_text']);
+
+        return back()->with('success', 'Đã gửi tin nhắn.');
+    }
+
+    public function sendTodayTraining(Request $request, TelegramTrainingNotificationService $service): RedirectResponse
+    {
+        $validated = $request->validate([
+            'child_id' => ['required', 'integer', 'exists:children,id'],
+        ]);
+
+        try {
+            $service->sendTodayTraining(Child::findOrFail($validated['child_id']));
+        } catch (\InvalidArgumentException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        return back()->with('success', 'Đã gửi lịch tập hôm nay qua Telegram.');
+    }
+
+    public function simulateTrainingCallback(Request $request, TelegramTrainingNotificationService $service): RedirectResponse
+    {
+        $validated = $request->validate([
+            'training_session_id' => ['required', 'integer', 'exists:training_sessions,id'],
+            'action' => ['required', 'string', 'in:completed,not_completed,skipped,need_help'],
+        ]);
+
+        $service->simulateCallback(
+            TrainingSession::findOrFail($validated['training_session_id']),
+            $validated['action']
+        );
+
+        return back()->with('success', 'Đã giả lập callback Telegram.');
+    }
+
+    private function contactsPayload()
+    {
+        return TelegramContact::query()
+            ->withCount('messages')
+            ->latest('last_seen_at')
+            ->get()
+            ->map(fn (TelegramContact $contact) => [
+                'telegram_chat_id' => $contact->telegram_chat_id,
+                'telegram_user_id' => $contact->telegram_user_id,
+                'telegram_username' => $contact->telegram_username,
+                'display_name' => $contact->display_name,
+                'last_seen_at' => optional($contact->last_seen_at)->toIso8601String(),
+                'is_active' => $contact->is_active,
+                'messages_count' => $contact->messages_count,
+            ]);
+    }
+
+    private function messagesPayload(?string $chatId)
+    {
+        return TelegramMessage::query()
+            ->when($chatId, fn ($query) => $query->where('telegram_chat_id', $chatId))
+            ->latest()
+            ->limit(80)
+            ->get()
+            ->values()
+            ->map(fn (TelegramMessage $message) => [
+                'id' => $message->id,
+                'direction' => $message->direction,
+                'telegram_chat_id' => $message->telegram_chat_id,
+                'telegram_user_id' => $message->telegram_user_id,
+                'telegram_username' => $message->telegram_username,
+                'message_type' => $message->message_type,
+                'message_text' => $message->message_text,
+                'callback_data' => $message->callback_data,
+                'action_status' => $message->action_status,
+                'payload_json' => $message->payload_json,
+                'delivery_status' => $message->delivery_status,
+                'sent_at' => optional($message->sent_at)->toIso8601String(),
+                'received_at' => optional($message->received_at)->toIso8601String(),
+                'created_at' => optional($message->created_at)->toIso8601String(),
+                'related_child_id' => $message->related_child_id,
+                'related_training_id' => $message->related_training_id,
+            ]);
+    }
+
+    private function settingsPayload(): array
+    {
+        $settings = TelegramSetting::current();
+        $tokenConfigured = filled($settings->bot_token) || filled(config('services.telegram.bot_token'));
+
+        return [
+            'bot_username' => $settings->bot_username ?: config('services.telegram.bot_username'),
+            'bot_token_masked' => $settings->maskedToken(),
+            'default_chat_id' => $settings->default_chat_id,
+            'enabled' => $settings->enabled,
+            'has_bot_token' => $tokenConfigured,
+            'webhook_secret_configured' => filled($settings->webhook_secret) || filled(config('services.telegram.webhook_secret')),
+        ];
+    }
+
+    private function statsPayload(): array
+    {
+        $lastInbound = TelegramMessage::query()
+            ->where('direction', TelegramMessage::DIRECTION_INBOUND)
+            ->latest('received_at')
+            ->first();
+
+        return [
+            'messages_today' => TelegramMessage::query()->whereDate('created_at', today())->count(),
+            'last_inbound_text' => $lastInbound?->message_text,
+            'last_inbound_at' => optional($lastInbound?->received_at)->toIso8601String(),
+        ];
+    }
+
+    private function trainingTestPayload(): array
+    {
+        $children = Child::query()
+            ->whereIn('status', [Child::STATUS_ACTIVE, Child::STATUS_PAUSED])
+            ->orderBy('full_name')
+            ->get(['id', 'full_name', 'status'])
+            ->map(fn (Child $child) => [
+                'id' => $child->id,
+                'full_name' => $child->full_name,
+                'status' => $child->status,
+            ]);
+
+        $sessions = TrainingSession::query()
+            ->with('child:id,full_name,status')
+            ->whereDate('session_date', today())
+            ->orderBy('scheduled_time')
+            ->orderBy('id')
+            ->get(['id', 'child_id', 'session_date', 'scheduled_time', 'status'])
+            ->map(fn (TrainingSession $session) => [
+                'id' => $session->id,
+                'child_id' => $session->child_id,
+                'child_name' => $session->child?->full_name,
+                'status' => $session->status,
+                'scheduled_time' => $session->scheduled_time,
+            ]);
+
+        $lastWebhook = TelegramMessage::query()
+            ->whereIn('message_type', ['training_callback', 'callback', 'text'])
+            ->latest()
+            ->first();
+
+        return [
+            'children' => $children,
+            'sessions' => $sessions,
+            'last_webhook' => $lastWebhook ? [
+                'id' => $lastWebhook->id,
+                'message_text' => $lastWebhook->message_text,
+                'callback_data' => $lastWebhook->callback_data,
+                'action_status' => $lastWebhook->action_status,
+                'created_at' => optional($lastWebhook->created_at)->toIso8601String(),
+            ] : null,
+        ];
+    }
+}
