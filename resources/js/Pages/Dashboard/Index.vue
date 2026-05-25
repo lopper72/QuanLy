@@ -37,6 +37,18 @@ defineProps({
   children_progress_summary: {
     type: Array,
     required: true
+  },
+  today_supplement_reminders: {
+    type: Array,
+    default: () => []
+  },
+  today_meal_reminders: {
+    type: Array,
+    default: () => []
+  },
+  latest_stool_note: {
+    type: Object,
+    default: null
   }
 })
 </script>
@@ -132,6 +144,40 @@ defineProps({
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <TodayTrainingCard :sessions="today_training_summary" />
         <WeeklyCompletionCard :stats="weekly_training_completion" />
+      </div>
+
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <section class="rounded-lg bg-white p-5 shadow">
+          <h2 class="text-lg font-semibold text-gray-900">Lịch bổ sung hôm nay</h2>
+          <div class="mt-4 space-y-3">
+            <div v-for="item in today_supplement_reminders" :key="item.id" class="rounded-md border border-gray-200 p-3">
+              <p class="text-sm font-semibold text-gray-900">{{ item.name }}</p>
+              <p class="text-xs text-gray-500">{{ item.child_name }} · {{ item.display_time }}</p>
+            </div>
+            <p v-if="today_supplement_reminders.length === 0" class="text-sm text-gray-500">Chưa có lịch bổ sung hôm nay.</p>
+          </div>
+        </section>
+
+        <section class="rounded-lg bg-white p-5 shadow">
+          <h2 class="text-lg font-semibold text-gray-900">Lịch ăn uống hôm nay</h2>
+          <div class="mt-4 space-y-3">
+            <div v-for="item in today_meal_reminders" :key="item.id" class="rounded-md border border-gray-200 p-3">
+              <p class="text-sm font-semibold text-gray-900">{{ item.meal_time }}</p>
+              <p class="text-xs text-gray-500">{{ item.title }}</p>
+            </div>
+            <p v-if="today_meal_reminders.length === 0" class="text-sm text-gray-500">Chưa có lịch ăn uống hôm nay.</p>
+          </div>
+        </section>
+
+        <section class="rounded-lg bg-white p-5 shadow">
+          <h2 class="text-lg font-semibold text-gray-900">Ghi nhận đi tiêu gần nhất</h2>
+          <div v-if="latest_stool_note" class="mt-4 rounded-md border border-gray-200 p-3">
+            <p class="text-sm font-semibold text-gray-900">{{ latest_stool_note.child_name }}</p>
+            <p class="mt-1 text-sm text-gray-600">{{ latest_stool_note.stool_note }}</p>
+            <p v-if="latest_stool_note.water_note" class="mt-1 text-xs text-gray-500">{{ latest_stool_note.water_note }}</p>
+          </div>
+          <p v-else class="mt-4 text-sm text-gray-500">Chưa có ghi nhận đi tiêu.</p>
+        </section>
       </div>
 
       <!-- Full-Width Progress Table -->

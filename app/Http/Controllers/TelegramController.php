@@ -4,10 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\TelegramContact;
 use App\Models\TelegramMessage;
+use App\Models\TelegramReminderLog;
 use App\Models\TelegramSetting;
 use App\Models\Child;
+use App\Models\MealPlanItem;
+use App\Models\SupplementSchedule;
 use App\Models\TrainingSession;
 use App\Services\TelegramService;
+use App\Services\TelegramReminderService;
 use App\Services\TelegramTrainingNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -30,6 +34,7 @@ class TelegramController extends Controller
             'stats' => $this->statsPayload(),
             'trainingTest' => $this->trainingTestPayload(),
             'systemStatus' => $this->systemStatusPayload(),
+            'reminderTest' => $this->reminderTestPayload(),
         ]);
     }
 
@@ -133,6 +138,70 @@ class TelegramController extends Controller
             'status' => $response->status(),
             'telegram' => $response->json(),
         ]);
+    }
+
+    public function testBot(TelegramService $telegramService): RedirectResponse
+    {
+        $response = $telegramService->getWebhookInfo();
+
+        if (!$response?->successful()) {
+            return back()->with('error', 'Chưa cấu hình Telegram Bot.');
+        }
+
+        return back()->with('success', 'Bot Telegram đã phản hồi.');
+    }
+
+    public function testWebhookInfo(TelegramService $telegramService): RedirectResponse
+    {
+        $response = $telegramService->getWebhookInfo();
+
+        if (!$response?->successful()) {
+            return back()->with('error', 'Chưa xem được trạng thái webhook.');
+        }
+
+        return back()->with('success', 'Đã kiểm tra trạng thái webhook.');
+    }
+
+    public function testSendMessage(Request $request, TelegramService $telegramService): RedirectResponse
+    {
+        return $this->testSend($request, $telegramService);
+    }
+
+    public function testTrainingSchedule(Request $request, TelegramTrainingNotificationService $service): RedirectResponse
+    {
+        return $this->sendTodayTraining($request, $service);
+    }
+
+    public function testReminderTraining(TelegramReminderService $service): RedirectResponse
+    {
+        return $this->sendTestReminder($service, TelegramReminderLog::TYPE_TRAINING);
+    }
+
+    public function testReminderMeal(TelegramReminderService $service): RedirectResponse
+    {
+        return $this->sendTestReminder($service, TelegramReminderLog::TYPE_MEAL);
+    }
+
+    public function testReminderSupplement(TelegramReminderService $service): RedirectResponse
+    {
+        return $this->sendTestReminder($service, TelegramReminderLog::TYPE_SUPPLEMENT);
+    }
+
+    public function simulateCallback(Request $request, TelegramTrainingNotificationService $trainingService): RedirectResponse
+    {
+        return $this->simulateTrainingCallback($request, $trainingService);
+    }
+
+    private function sendTestReminder(TelegramReminderService $service, string $type): RedirectResponse
+    {
+        try {
+            $log = $service->testReminder($type);
+            $service->sendReminderLog($log);
+        } catch (\Throwable $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        return back()->with('success', 'Đã gửi thử nhắc lịch Telegram.');
     }
 
     public function health(TelegramService $telegramService): JsonResponse
@@ -299,6 +368,55 @@ class TelegramController extends Controller
             'bot_reachable' => $info !== null || filled($settings->bot_token) || filled(config('services.telegram.bot_token')),
             'last_inbound_at' => optional($lastInbound?->received_at)->toIso8601String(),
             'last_outbound_at' => optional($lastOutbound?->sent_at)->toIso8601String(),
+        ];
+    }
+
+    private function reminderTestPayload(): array
+    {
+        return [
+            'training_sessions' => TrainingSession::with('child:id,full_name,status')
+                ->whereDate('session_date', today())
+                ->whereNotNull('scheduled_time')
+                ->latest('id')
+                ->limit(10)
+                ->get(['id', 'child_id', 'scheduled_time', 'status'])
+                ->map(fn (TrainingSession $session) => [
+                    'id' => $session->id,
+                    'child_name' => $session->child?->full_name,
+                    'scheduled_time' => $session->scheduled_time,
+                    'status' => $session->status,
+                ]),
+            'meal_items' => MealPlanItem::query()
+                ->where('day_of_week', today()->dayOfWeekIso)
+                ->whereNotNull('scheduled_time')
+                ->orderBy('scheduled_time')
+                ->limit(10)
+                ->get(['id', 'scheduled_time', 'title', 'meal_time']),
+            'supplements' => SupplementSchedule::with('child:id,full_name,status')
+                ->active()
+                ->whereNotNull('scheduled_time')
+                ->orderBy('scheduled_time')
+                ->limit(10)
+                ->get()
+                ->map(fn (SupplementSchedule $schedule) => [
+                    'id' => $schedule->id,
+                    'child_name' => $schedule->child?->full_name,
+                    'name' => $schedule->name,
+                    'scheduled_time' => $schedule->scheduled_time,
+                ]),
+            'logs' => TelegramReminderLog::with('child:id,full_name')
+                ->latest()
+                ->limit(12)
+                ->get()
+                ->map(fn (TelegramReminderLog $log) => [
+                    'id' => $log->id,
+                    'child_name' => $log->child?->full_name,
+                    'reminder_type' => $log->reminder_type,
+                    'scheduled_for' => optional($log->scheduled_for)->toIso8601String(),
+                    'reminder_due_at' => optional($log->reminder_due_at)->toIso8601String(),
+                    'status' => $log->status,
+                    'error_message' => $log->error_message,
+                ]),
         ];
     }
 

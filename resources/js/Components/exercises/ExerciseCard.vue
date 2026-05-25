@@ -1,68 +1,79 @@
 <template>
-  <div class="flex h-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
-    <div class="h-40 w-full bg-slate-100">
+  <article class="flex h-full min-h-[430px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition hover:border-indigo-200 hover:shadow-md">
+    <div class="h-36 w-full shrink-0 bg-slate-100 sm:h-40">
       <ExerciseThumbnail :exercise="exercise" :alt="exercise.title" size="card" />
     </div>
 
-    <div class="flex flex-1 flex-col gap-3 p-4">
-      <div class="flex flex-wrap items-center gap-2">
-        <span :class="['rounded-full border px-2.5 py-1 text-xs font-medium', categoryColor(exercise.category)]">
+    <div class="flex min-h-0 flex-1 flex-col p-4">
+      <div class="mb-3 flex flex-wrap items-center gap-2">
+        <span :class="['rounded-full border px-2.5 py-1 text-xs font-medium leading-none', categoryColor(exercise.category)]">
           {{ labelFor(categoryLabels, exercise.category) }}
         </span>
-        <span v-if="exercise.difficulty" :class="['rounded-full border px-2.5 py-1 text-xs font-medium', difficultyColor(exercise.difficulty)]">
+        <span v-if="exercise.difficulty" :class="['rounded-full border px-2.5 py-1 text-xs font-medium leading-none', difficultyColor(exercise.difficulty)]">
           {{ labelFor(difficultyLabels, exercise.difficulty) }}
         </span>
-        <span v-if="exercise.estimated_minutes" class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+        <span v-if="exercise.estimated_minutes" class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium leading-none text-slate-700">
           {{ exercise.estimated_minutes }} phút
         </span>
       </div>
 
-      <div class="space-y-2">
-        <h3 class="line-clamp-2 text-base font-semibold text-slate-950">{{ exercise.title }}</h3>
-        <p class="line-clamp-3 text-sm leading-6 text-slate-600">
-          {{ exercise.description || exercise.instructions || 'Bài tập đang được cập nhật hướng dẫn.' }}
+      <h3 class="line-clamp-2 min-h-[48px] text-base font-semibold leading-6 text-slate-950">
+        {{ exercise.title }}
+      </h3>
+
+      <p class="line-clamp-2 mt-2 min-h-[44px] text-sm leading-5 text-slate-600">
+        {{ compactSummary }}
+      </p>
+
+      <div class="mt-3 min-h-[44px] rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2">
+        <p class="line-clamp-2 text-sm leading-5 text-emerald-900">
+          <span class="font-medium">Lợi ích:</span>
+          {{ quickBenefit }}
         </p>
       </div>
 
-      <div v-if="exercise.target_skill || exercise.required_tools" class="space-y-2 rounded-md bg-slate-50 p-3 text-sm text-slate-700">
-        <p v-if="exercise.target_skill">
-          <span class="font-medium">Phù hợp cho mục tiêu:</span>
-          {{ labelFor(skillLabels, exercise.target_skill, exercise.target_skill) }}
-        </p>
-        <p v-if="exercise.required_tools" class="line-clamp-2">
-          <span class="font-medium">Dụng cụ:</span>
-          {{ exercise.required_tools }}
-        </p>
-      </div>
-
-      <div v-if="exercise.weekly_expectation" class="rounded-md border border-emerald-100 bg-emerald-50 p-3 text-sm leading-6 text-emerald-900">
-        <span class="font-medium">Sau 1 tuần:</span>
-        {{ exercise.weekly_expectation }}
-      </div>
-
-      <div class="mt-auto flex items-center justify-between border-t border-slate-100 pt-3">
-        <Link :href="`/exercises/${exercise.id}`" class="text-sm font-semibold text-indigo-700 hover:text-indigo-900">
-          Xem hướng dẫn
+      <div class="mt-auto flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <Link
+          :href="`/exercises/${exercise.id}`"
+          class="inline-flex min-h-10 items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        >
+          Xem chi tiết
         </Link>
-        <Link :href="`/exercises/${exercise.id}/edit`" class="text-sm font-medium text-slate-600 hover:text-slate-900">
+        <Link
+          :href="`/exercises/${exercise.id}/edit`"
+          class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-center text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        >
           Chỉnh sửa
         </Link>
       </div>
     </div>
-  </div>
+  </article>
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
-import { categoryLabels, difficultyLabels, labelFor, skillLabels } from '@/Lib/labels';
+import { categoryLabels, difficultyLabels, labelFor } from '@/Lib/labels';
 import ExerciseThumbnail from './ExerciseThumbnail.vue';
 
-defineProps({
+const props = defineProps({
   exercise: {
     type: Object,
     required: true,
   },
 });
+
+const compactSummary = computed(() => (
+  props.exercise.description ||
+  props.exercise.instructions ||
+  'Bài tập đang được cập nhật mô tả ngắn.'
+));
+
+const quickBenefit = computed(() => (
+  props.exercise.expected_benefits ||
+  props.exercise.weekly_expectation ||
+  'Giúp bé luyện kỹ năng nền tảng và tăng khả năng hợp tác.'
+));
 
 const categoryColor = (category) => ({
   gross_motor: 'bg-blue-50 text-blue-700 border-blue-200',

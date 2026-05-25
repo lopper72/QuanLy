@@ -9,13 +9,14 @@
       <button
         type="button"
         class="flex w-full items-start justify-between gap-4 p-5 text-left transition hover:bg-slate-50"
+        :aria-expanded="expanded[group.key]"
         @click="toggle(group.key)"
       >
-        <div class="flex gap-4">
-          <div :class="['flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border text-lg', iconColor(group.key)]">
+        <div class="flex min-w-0 gap-4">
+          <div :class="['flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold', iconColor(group.key)]">
             {{ iconFor(group.key) }}
           </div>
-          <div class="space-y-2">
+          <div class="min-w-0 space-y-2">
             <div class="flex flex-wrap items-center gap-2">
               <h2 class="text-lg font-semibold text-slate-950">{{ group.label }}</h2>
               <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
@@ -34,7 +35,13 @@
             </div>
           </div>
         </div>
-        <span :class="['mt-1 text-xl text-slate-400 transition-transform duration-200', expanded[group.key] ? 'rotate-180' : '']">⌄</span>
+        <span
+          class="mt-1 shrink-0 text-lg text-slate-400 transition-transform duration-200"
+          :class="expanded[group.key] ? 'rotate-180' : ''"
+          aria-hidden="true"
+        >
+          ˅
+        </span>
       </button>
 
       <Transition
@@ -54,7 +61,7 @@
             />
           </div>
           <p v-else class="rounded-md bg-white p-4 text-sm text-slate-500">
-            Chưa có bài tập phù hợp với bộ lọc trong nhóm này.
+            Chưa có bài tập trong nhóm này.
           </p>
         </div>
       </Transition>
@@ -84,7 +91,7 @@ watch(
   (groups) => {
     groups.forEach((group, index) => {
       if (expanded[group.key] === undefined) {
-        expanded[group.key] = props.expandFirst && index === 0;
+        expanded[group.key] = props.expandFirst && index === 0 && group.count > 0;
       }
     });
   },

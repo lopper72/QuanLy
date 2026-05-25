@@ -24,6 +24,8 @@ class StoreSessionRequest extends FormRequest
             'duration_minutes' => ['nullable', 'integer', 'min:1'],
             'status' => ['nullable', 'string', 'in:planned,in_progress,completed,skipped,not_completed,need_help'],
             'notes' => ['nullable', 'string'],
+            'combo_ids' => ['nullable', 'array'],
+            'combo_ids.*' => ['integer', 'exists:exercise_combos,id'],
             
             // Nested items validation
             'items' => ['nullable', 'array'],
@@ -32,6 +34,12 @@ class StoreSessionRequest extends FormRequest
             'items.*.duration_minutes' => ['nullable', 'integer', 'min:0'],
             'items.*.completion_status' => ['nullable', 'string', 'in:not_started,completed,partially_completed,skipped'],
             'items.*.therapist_note' => ['nullable', 'string'],
+            'exercise_items' => ['nullable', 'array'],
+            'exercise_items.*.exercise_id' => ['required', 'exists:exercises,id'],
+            'exercise_items.*.sort_order' => ['nullable', 'integer'],
+            'exercise_items.*.duration_minutes' => ['nullable', 'integer', 'min:0'],
+            'exercise_items.*.completion_status' => ['nullable', 'string', 'in:not_started,completed,partially_completed,skipped'],
+            'exercise_items.*.therapist_note' => ['nullable', 'string'],
         ];
     }
 }

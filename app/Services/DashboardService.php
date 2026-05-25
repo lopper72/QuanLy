@@ -4,6 +4,10 @@ namespace App\Services;
 
 use App\Models\Child;
 use App\Models\Exercise;
+use App\Models\MealLog;
+use App\Models\MealPlanItem;
+use App\Models\SupplementLog;
+use App\Models\SupplementSchedule;
 use App\Models\TrainingSession;
 use App\Models\BehaviorLog;
 use App\Models\Assessment;
@@ -281,6 +285,68 @@ class DashboardService
             'recent_behavior_logs' => $this->getRecentBehaviorLogs(),
             'latest_assessments' => $this->getLatestAssessments(),
             'children_progress_summary' => $this->getChildrenProgressSummary(),
+            'today_supplement_reminders' => $this->getTodaySupplementReminders(),
+            'today_meal_reminders' => $this->getTodayMealReminders(),
+            'latest_stool_note' => $this->getLatestStoolNote(),
+        ];
+    }
+
+    public function getTodaySupplementReminders(): array
+    {
+        $today = today()->toDateString();
+
+        return SupplementSchedule::with(['child', 'logs' => fn ($query) => $query->whereDate('scheduled_for', $today)])
+            ->whereHas('child', fn ($query) => $query->active())
+            ->active()
+            ->orderBy('scheduled_time')
+            ->limit(6)
+            ->get()
+            ->map(fn (SupplementSchedule $schedule) => [
+                'id' => $schedule->id,
+                'child_name' => $schedule->child?->full_name,
+                'name' => $schedule->name,
+                'display_time' => $this->supplementDisplayTime($schedule),
+                'status' => $schedule->logs->first()?->status ?? 'pending',
+            ])
+            ->toArray();
+    }
+
+    public function getTodayMealReminders(): array
+    {
+        $todayDay = (int) today()->dayOfWeekIso;
+
+        return MealPlanItem::with('template')
+            ->whereHas('template', fn ($query) => $query->active())
+            ->where('day_of_week', $todayDay)
+            ->orderBy('meal_time')
+            ->limit(6)
+            ->get()
+            ->map(fn (MealPlanItem $item) => [
+                'id' => $item->id,
+                'template_title' => $item->template?->title,
+                'meal_time' => $this->mealTimeLabel($item->meal_time),
+                'title' => $item->title,
+            ])
+            ->toArray();
+    }
+
+    public function getLatestStoolNote(): ?array
+    {
+        $log = MealLog::with('child')
+            ->whereNotNull('stool_note')
+            ->orderBy('meal_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->first();
+
+        if (!$log) {
+            return null;
+        }
+
+        return [
+            'child_name' => $log->child?->full_name,
+            'meal_date' => $log->meal_date?->toDateString(),
+            'stool_note' => $log->stool_note,
+            'water_note' => $log->water_note,
         ];
     }
 
@@ -295,6 +361,37 @@ class DashboardService
             'Sat' => 'Thứ 7',
             'Sun' => 'Chủ nhật',
         ][$weekday] ?? $weekday;
+    }
+
+    protected function supplementDisplayTime(SupplementSchedule $schedule): string
+    {
+        if ($schedule->timing_type === 'fixed_time' && $schedule->scheduled_time) {
+            return substr($schedule->scheduled_time, 0, 5);
+        }
+
+        return [
+            'before_meal' => 'Trước bữa ăn',
+            'after_meal' => 'Sau bữa ăn',
+            'before_breakfast' => 'Trước bữa sáng',
+            'before_lunch' => 'Trước bữa trưa',
+            'before_dinner' => 'Trước bữa tối',
+            'after_breakfast' => 'Sau bữa sáng',
+            'after_lunch' => 'Sau bữa trưa',
+            'after_dinner' => 'Sau bữa tối',
+            'bedtime' => 'Trước khi ngủ',
+        ][$schedule->meal_relation ?: $schedule->timing_type] ?? 'Theo lịch';
+    }
+
+    protected function mealTimeLabel(string $mealTime): string
+    {
+        return [
+            'breakfast' => 'Bữa sáng',
+            'snack' => 'Bữa phụ',
+            'lunch' => 'Bữa trưa',
+            'dinner' => 'Bữa tối',
+            'water' => 'Nhắc uống nước',
+            'toilet' => 'Thói quen đi vệ sinh',
+        ][$mealTime] ?? $mealTime;
     }
 
     protected function sessionExerciseThumbnails(TrainingSession $session): array

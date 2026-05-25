@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\Exercise;
+use App\Models\ExerciseCombo;
 use App\Models\TrainingSession;
 use App\Models\TrainingSessionItem;
 use Illuminate\Support\Carbon;
@@ -48,7 +50,8 @@ class TrainingService
     public function createSession(array $data): TrainingSession
     {
         return DB::transaction(function () use ($data) {
-            $totalMinutes = collect($data['items'] ?? [])->sum('duration_minutes');
+            $sessionItems = $this->buildSessionItemsFromCombosAndManualItems($data);
+            $totalMinutes = collect($sessionItems)->sum('duration_minutes');
 
             $session = TrainingSession::create([
                 'child_id' => $data['child_id'],
@@ -59,20 +62,81 @@ class TrainingService
                 'notes' => $data['notes'] ?? null,
             ]);
 
-            if (isset($data['items']) && is_array($data['items'])) {
-                foreach ($data['items'] as $index => $itemData) {
-                    $session->items()->create([
-                        'exercise_id' => $itemData['exercise_id'],
-                        'sort_order' => $itemData['sort_order'] ?? ($index + 1),
-                        'duration_minutes' => $itemData['duration_minutes'] ?? null,
-                        'completion_status' => $itemData['completion_status'] ?? 'not_started',
-                        'therapist_note' => $itemData['therapist_note'] ?? null,
-                    ]);
-                }
+            foreach ($sessionItems as $index => $itemData) {
+                $session->items()->create([
+                    'exercise_id' => $itemData['exercise_id'],
+                    'sort_order' => $index + 1,
+                    'duration_minutes' => $itemData['duration_minutes'] ?? null,
+                    'completion_status' => $itemData['completion_status'] ?? 'not_started',
+                    'therapist_note' => $itemData['therapist_note'] ?? null,
+                ]);
             }
 
             return $session->load(['child', 'items.exercise']);
         });
+    }
+
+    protected function buildSessionItemsFromCombosAndManualItems(array $data): array
+    {
+        $items = [];
+        $seenExerciseIds = [];
+        $comboIds = collect($data['combo_ids'] ?? [])
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($comboIds->isNotEmpty()) {
+            $combos = ExerciseCombo::with(['exercises' => fn ($query) => $query->where('is_active', true)])
+                ->whereIn('id', $comboIds)
+                ->get()
+                ->sortBy(fn ($combo) => $comboIds->search($combo->id));
+
+            foreach ($combos as $combo) {
+                foreach ($combo->exercises as $exercise) {
+                    if (isset($seenExerciseIds[$exercise->id])) {
+                        continue;
+                    }
+
+                    $seenExerciseIds[$exercise->id] = true;
+                    $items[] = [
+                        'exercise_id' => $exercise->id,
+                        'duration_minutes' => $exercise->pivot?->duration_minutes
+                            ?? $exercise->estimated_minutes
+                            ?? 15,
+                        'completion_status' => 'not_started',
+                        'therapist_note' => null,
+                    ];
+                }
+            }
+        }
+
+        $manualItems = $data['exercise_items'] ?? ($data['items'] ?? []);
+        $manualExerciseDurations = Exercise::whereIn(
+            'id',
+            collect($manualItems)
+                ->pluck('exercise_id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+        )->pluck('estimated_minutes', 'id');
+
+        foreach ($manualItems as $itemData) {
+            $exerciseId = (int) ($itemData['exercise_id'] ?? 0);
+            if ($exerciseId < 1 || isset($seenExerciseIds[$exerciseId])) {
+                continue;
+            }
+
+            $seenExerciseIds[$exerciseId] = true;
+            $items[] = [
+                'exercise_id' => $exerciseId,
+                'duration_minutes' => $itemData['duration_minutes'] ?? $manualExerciseDurations[$exerciseId] ?? 15,
+                'completion_status' => $itemData['completion_status'] ?? 'not_started',
+                'therapist_note' => $itemData['therapist_note'] ?? null,
+            ];
+        }
+
+        return $items;
     }
 
     /**

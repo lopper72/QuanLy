@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Child;
 use App\Models\Exercise;
+use App\Models\ExerciseCombo;
 use App\Models\TrainingSession;
 use App\Models\TrainingSessionItem;
 use App\Http\Requests\Training\StoreSessionRequest;
@@ -50,10 +51,14 @@ class TrainingController extends Controller
     {
         $children = Child::active()->orderBy('full_name')->get();
         $exercises = Exercise::where('is_active', true)->orderBy('title')->get();
+        $exerciseCombos = ExerciseCombo::with(['exercises' => fn ($query) => $query->where('is_active', true)])
+            ->orderBy('title')
+            ->get();
 
         return Inertia::render('Training/Create', [
             'children' => $children,
             'exercises' => $exercises,
+            'exerciseCombos' => $exerciseCombos,
         ]);
     }
 

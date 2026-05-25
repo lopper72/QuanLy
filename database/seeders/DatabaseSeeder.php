@@ -8,6 +8,7 @@ use App\Models\BehaviorLog;
 use App\Models\Child;
 use App\Models\Exercise;
 use App\Models\Report;
+use App\Models\SupplementSchedule;
 use App\Models\TrainingSession;
 use App\Models\TrainingSessionItem;
 use App\Models\User;
@@ -43,6 +44,37 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->call(InterventionProgramSeeder::class);
+        $this->call(SupportiveMealPlanSeeder::class);
+
+        if ($children->isNotEmpty()) {
+            $sampleChild = $children->first();
+            SupplementSchedule::updateOrCreate(
+                ['child_id' => $sampleChild->id, 'name' => 'DHA'],
+                [
+                    'type' => 'Bổ sung',
+                    'dosage_note' => 'Nhập liều dùng theo hướng dẫn của bác sĩ hoặc nhãn sản phẩm.',
+                    'timing_type' => 'fixed_time',
+                    'scheduled_time' => '21:00',
+                    'frequency' => 'hằng ngày',
+                    'status' => 'active',
+                    'notes' => '21:00 hằng ngày.',
+                ]
+            );
+
+            SupplementSchedule::updateOrCreate(
+                ['child_id' => $sampleChild->id, 'name' => 'Vương Não Khang'],
+                [
+                    'type' => 'Bổ sung',
+                    'dosage_note' => 'Nhập liều dùng theo hướng dẫn của bác sĩ hoặc nhãn sản phẩm.',
+                    'timing_type' => 'before_meal',
+                    'meal_relation' => 'before_meal',
+                    'frequency' => 'hằng ngày',
+                    'status' => 'active',
+                    'notes' => 'Trước bữa ăn.',
+                ]
+            );
+        }
+
         $exercises = Exercise::active()->get();
 
         $sessions = collect();

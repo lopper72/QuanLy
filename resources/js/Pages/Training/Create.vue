@@ -1,26 +1,25 @@
 <template>
   <AppLayout>
-    <div class="max-w-7xl mx-auto space-y-6">
-      <!-- Breadcrumb / Back button -->
+    <div class="mx-auto max-w-7xl space-y-6">
       <div>
         <Link
           :href="route('training.index')"
-          class="text-xs font-semibold text-indigo-600 hover:underline flex items-center space-x-1"
+          class="flex items-center space-x-1 text-xs font-semibold text-indigo-600 hover:underline"
         >
           <span>← Quay lại danh sách buổi tập</span>
         </Link>
-        <h1 class="text-3xl font-bold leading-tight text-gray-900 mt-2">
+        <h1 class="mt-2 text-3xl font-bold leading-tight text-gray-900">
           Tạo buổi tập mới
         </h1>
         <p class="text-sm text-gray-500">
-          Lên lịch và sắp xếp chuỗi bài tập kỹ năng hằng ngày cho trẻ.
+          Chọn combo bài tập hoặc thêm từng bài riêng lẻ để lập lịch can thiệp cho bé.
         </p>
       </div>
 
-      <!-- Training Session Form -->
       <TrainingSessionForm
         :children="children"
         :exercises="exercises"
+        :exercise-combos="exerciseCombos"
       />
     </div>
   </AppLayout>
@@ -39,6 +38,10 @@ defineProps({
   exercises: {
     type: Array,
     required: true,
+  },
+  exerciseCombos: {
+    type: Array,
+    default: () => [],
   },
 });
 </script>

@@ -96,6 +96,21 @@ class Child extends Model
         return $this->hasMany(ProgressLog::class);
     }
 
+    public function supplementSchedules()
+    {
+        return $this->hasMany(SupplementSchedule::class);
+    }
+
+    public function supplementLogs()
+    {
+        return $this->hasMany(SupplementLog::class);
+    }
+
+    public function mealLogs()
+    {
+        return $this->hasMany(MealLog::class);
+    }
+
     public function streakTracking()
     {
         return $this->hasOne(StreakTracking::class);

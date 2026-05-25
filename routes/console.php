@@ -6,6 +6,7 @@ use App\Models\Exercise;
 use App\Models\Reminder;
 use App\Models\User;
 use App\Services\TelegramService;
+use App\Services\TelegramReminderService;
 use App\Services\TrainingService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -230,6 +231,19 @@ Artisan::command('telegram:webhook:delete', function (TelegramService $telegramS
 })->purpose('Xóa webhook Telegram');
 
 Schedule::command('telegram:send-reminders')->everyMinute();
+
+Artisan::command('telegram:send-due-reminders', function (TelegramReminderService $reminderService) {
+    $result = $reminderService->sendDueReminders();
+
+    $this->info("Tìm thấy {$result['pending']} nhắc lịch đến hạn.");
+    $this->line("Đã gửi: {$result['sent']}");
+    $this->line("Thất bại: {$result['failed']}");
+    $this->line("Bỏ qua: {$result['skipped']}");
+
+    return $result['failed'] > 0 ? 1 : 0;
+})->purpose('Gửi các nhắc lịch Telegram đến hạn trước 30 phút');
+
+Schedule::command('telegram:send-due-reminders')->everyMinute();
 
 Artisan::command('training:close-missed', function (TrainingService $trainingService) {
     $count = $trainingService->closeMissedSessions();

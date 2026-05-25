@@ -383,12 +383,14 @@ class ExerciseControllerTest extends TestCase
         Exercise::factory()->create([
             'title' => 'Bật nhảy trên thảm',
             'category' => 'gross_motor',
+            'instructions' => 'No matching keyword here.',
             'is_active' => true,
             'expected_benefits' => 'Cải thiện thăng bằng',
         ]);
         Exercise::factory()->create([
             'title' => 'Xâu hạt lớn',
             'category' => 'fine_motor',
+            'instructions' => 'No matching keyword here.',
             'is_active' => true,
         ]);
 

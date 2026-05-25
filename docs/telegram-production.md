@@ -132,3 +132,36 @@ Log không chứa bot token hoặc webhook secret.
 10. Kiểm tra `/telegram` có inbound callback.
 11. Kiểm tra `/training/{id}` đã cập nhật trạng thái.
 12. Kiểm tra không có mojibake tiếng Việt.
+
+## Nhắc lịch tự động
+
+Hệ thống có lệnh gửi nhắc lịch Telegram trước 30 phút cho:
+
+- Lịch tập
+- Lịch ăn uống
+- Lịch bổ sung
+
+Lệnh chạy thủ công:
+
+```bash
+php artisan telegram:send-due-reminders
+```
+
+Cron production:
+
+```cron
+* * * * * cd /path/to/project && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Nếu dùng queue khác `sync`, cần chạy thêm:
+
+```bash
+php artisan queue:work --tries=3
+```
+
+## Xử lý lỗi nhắc lịch
+
+- Không gửi nhắc lịch: kiểm tra `TELEGRAM_BOT_TOKEN`, `default_chat_id`, trạng thái bé và thời gian lịch.
+- Gửi trùng: kiểm tra bảng `telegram_reminder_logs`; hệ thống có khóa chống trùng theo loại nhắc, đối tượng, giờ nhắc và chat id.
+- Callback bổ sung không nhận: kiểm tra webhook đang trỏ đúng `/telegram/webhook`, có `allowed_updates` gồm `callback_query`.
+- Lịch ăn không nhắc: kiểm tra `meal_plan_items.scheduled_time` đã có giờ cụ thể.

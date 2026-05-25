@@ -10,8 +10,10 @@ use App\Http\Controllers\ChildController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DailyChecklistController;
 use App\Http\Controllers\ExerciseController;
+use App\Http\Controllers\MealPlanController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\SupplementController;
 use App\Http\Controllers\TelegramController;
 use App\Http\Controllers\TelegramWebhookController;
 use App\Http\Controllers\TrainingController;
@@ -81,6 +83,22 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/training-items/{trainingSessionItem}/quick-complete', [TrainingController::class, 'quickComplete'])->name('trainingSessionItem.quickComplete');
     Route::patch('/training-items/{trainingSessionItem}/quick-skip', [TrainingController::class, 'quickSkip'])->name('trainingSessionItem.quickSkip');
 
+    Route::prefix('supplements')->name('supplements.')->group(function () {
+        Route::get('/', [SupplementController::class, 'index'])->name('index');
+        Route::get('/create', [SupplementController::class, 'create'])->name('create');
+        Route::post('/', [SupplementController::class, 'store'])->name('store');
+        Route::get('/{supplement}/edit', [SupplementController::class, 'edit'])->name('edit');
+        Route::put('/{supplement}', [SupplementController::class, 'update'])->name('update');
+        Route::patch('/{supplement}/taken', [SupplementController::class, 'markTaken'])->name('taken');
+        Route::patch('/{supplement}/skip', [SupplementController::class, 'skip'])->name('skip');
+    });
+
+    Route::prefix('meal-plans')->name('mealPlans.')->group(function () {
+        Route::get('/', [MealPlanController::class, 'index'])->name('index');
+        Route::post('/apply', [MealPlanController::class, 'apply'])->name('apply');
+        Route::post('/logs', [MealPlanController::class, 'log'])->name('logs.store');
+    });
+
     // Exercise Library Routes
     Route::prefix('exercises')->name('exercises.')->group(function () {
         Route::get('/', [ExerciseController::class, 'index'])->name('index');
@@ -147,6 +165,14 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/test-send', [TelegramController::class, 'testSend'])->name('testSend');
         Route::post('/training/send-today', [TelegramController::class, 'sendTodayTraining'])->name('training.sendToday');
         Route::post('/training/simulate-callback', [TelegramController::class, 'simulateTrainingCallback'])->name('training.simulateCallback');
+        Route::post('/test/bot', [TelegramController::class, 'testBot'])->name('test.bot');
+        Route::post('/test/webhook-info', [TelegramController::class, 'testWebhookInfo'])->name('test.webhookInfo');
+        Route::post('/test/send-message', [TelegramController::class, 'testSendMessage'])->name('test.sendMessage');
+        Route::post('/test/training-schedule', [TelegramController::class, 'testTrainingSchedule'])->name('test.trainingSchedule');
+        Route::post('/test/reminder/training', [TelegramController::class, 'testReminderTraining'])->name('test.reminder.training');
+        Route::post('/test/reminder/meal', [TelegramController::class, 'testReminderMeal'])->name('test.reminder.meal');
+        Route::post('/test/reminder/supplement', [TelegramController::class, 'testReminderSupplement'])->name('test.reminder.supplement');
+        Route::post('/test/callback/simulate', [TelegramController::class, 'simulateCallback'])->name('test.callback.simulate');
         Route::get('/webhook-info', [TelegramController::class, 'webhookInfo'])->name('webhookInfo');
         Route::get('/messages', [TelegramController::class, 'messages'])->name('messages');
         Route::post('/send', [TelegramController::class, 'send'])->name('send');

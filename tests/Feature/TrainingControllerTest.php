@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Child;
 use App\Models\Exercise;
+use App\Models\ExerciseCombo;
 use App\Models\TrainingSession;
 use App\Models\TrainingSessionItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -384,6 +385,172 @@ class TrainingControllerTest extends TestCase
     /**
      * Test training session validation.
      */
+    public function test_create_page_includes_exercise_combos(): void
+    {
+        $exercise = Exercise::factory()->create(['is_active' => true]);
+        $combo = ExerciseCombo::create([
+            'title' => 'Combo tăng tập trung',
+            'slug' => 'combo-tang-tap-trung',
+            'description' => 'Chuỗi bài tập giúp bé duy trì chú ý.',
+            'target_skill' => 'attention',
+            'estimated_minutes' => 20,
+            'difficulty' => 'easy',
+        ]);
+        $combo->exercises()->attach($exercise->id, ['sort_order' => 1]);
+
+        $response = $this->get('/training/create');
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Training/Create')
+            ->has('exerciseCombos', 1)
+            ->where('exerciseCombos.0.title', 'Combo tăng tập trung')
+            ->where('exerciseCombos.0.exercises.0.id', $exercise->id)
+        );
+    }
+
+    public function test_can_create_training_session_with_one_combo(): void
+    {
+        $child = Child::factory()->create(['status' => 'active']);
+        $exercise1 = Exercise::factory()->create(['is_active' => true, 'estimated_minutes' => 10]);
+        $exercise2 = Exercise::factory()->create(['is_active' => true, 'estimated_minutes' => 15]);
+        $combo = ExerciseCombo::create([
+            'title' => 'Combo vận động buổi sáng',
+            'slug' => 'combo-van-dong-buoi-sang',
+            'description' => 'Các bài ngắn cho buổi sáng.',
+            'target_skill' => 'gross_motor',
+            'estimated_minutes' => 25,
+            'difficulty' => 'easy',
+        ]);
+        $combo->exercises()->attach([
+            $exercise1->id => ['sort_order' => 1],
+            $exercise2->id => ['sort_order' => 2],
+        ]);
+
+        $response = $this->post('/training', [
+            'child_id' => $child->id,
+            'session_date' => '2026-05-25',
+            'status' => 'planned',
+            'combo_ids' => [$combo->id],
+        ]);
+
+        $session = TrainingSession::latest('id')->first();
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect(route('training.show', $session->id));
+        $this->assertSame(2, $session->items()->count());
+        $this->assertDatabaseHas('training_sessions', [
+            'id' => $session->id,
+            'total_minutes' => 25,
+        ]);
+        $this->assertDatabaseHas('training_session_items', [
+            'training_session_id' => $session->id,
+            'exercise_id' => $exercise1->id,
+            'sort_order' => 1,
+            'duration_minutes' => 10,
+            'completion_status' => 'not_started',
+        ]);
+        $this->assertDatabaseHas('training_session_items', [
+            'training_session_id' => $session->id,
+            'exercise_id' => $exercise2->id,
+            'sort_order' => 2,
+            'duration_minutes' => 15,
+            'completion_status' => 'not_started',
+        ]);
+    }
+
+    public function test_combo_duplicate_exercises_are_not_added_twice(): void
+    {
+        $child = Child::factory()->create(['status' => 'active']);
+        $sharedExercise = Exercise::factory()->create(['is_active' => true, 'estimated_minutes' => 10]);
+        $otherExercise = Exercise::factory()->create(['is_active' => true, 'estimated_minutes' => 8]);
+        $combo1 = ExerciseCombo::create([
+            'title' => 'Combo chú ý',
+            'slug' => 'combo-chu-y',
+            'target_skill' => 'attention',
+            'estimated_minutes' => 10,
+            'difficulty' => 'easy',
+        ]);
+        $combo2 = ExerciseCombo::create([
+            'title' => 'Combo giao tiếp',
+            'slug' => 'combo-giao-tiep',
+            'target_skill' => 'communication',
+            'estimated_minutes' => 18,
+            'difficulty' => 'easy',
+        ]);
+        $combo1->exercises()->attach($sharedExercise->id, ['sort_order' => 1]);
+        $combo2->exercises()->attach([
+            $sharedExercise->id => ['sort_order' => 1],
+            $otherExercise->id => ['sort_order' => 2],
+        ]);
+
+        $this->post('/training', [
+            'child_id' => $child->id,
+            'session_date' => '2026-05-25',
+            'status' => 'planned',
+            'combo_ids' => [$combo1->id, $combo2->id],
+        ])->assertSessionHasNoErrors();
+
+        $session = TrainingSession::latest('id')->first();
+
+        $this->assertSame(2, $session->items()->count());
+        $this->assertSame(1, $session->items()->where('exercise_id', $sharedExercise->id)->count());
+    }
+
+    public function test_can_create_training_session_with_combo_and_manual_exercise(): void
+    {
+        $child = Child::factory()->create(['status' => 'active']);
+        $comboExercise = Exercise::factory()->create(['is_active' => true, 'estimated_minutes' => 12]);
+        $manualExercise = Exercise::factory()->create(['is_active' => true, 'estimated_minutes' => 9]);
+        $combo = ExerciseCombo::create([
+            'title' => 'Combo kỹ năng tự lập',
+            'slug' => 'combo-ky-nang-tu-lap',
+            'target_skill' => 'self_care',
+            'estimated_minutes' => 12,
+            'difficulty' => 'medium',
+        ]);
+        $combo->exercises()->attach($comboExercise->id, ['sort_order' => 1]);
+
+        $this->post('/training', [
+            'child_id' => $child->id,
+            'session_date' => '2026-05-25',
+            'status' => 'planned',
+            'combo_ids' => [$combo->id],
+            'items' => [
+                ['exercise_id' => $manualExercise->id],
+            ],
+        ])->assertSessionHasNoErrors();
+
+        $session = TrainingSession::latest('id')->first();
+
+        $this->assertDatabaseHas('training_session_items', [
+            'training_session_id' => $session->id,
+            'exercise_id' => $comboExercise->id,
+            'sort_order' => 1,
+            'duration_minutes' => 12,
+        ]);
+        $this->assertDatabaseHas('training_session_items', [
+            'training_session_id' => $session->id,
+            'exercise_id' => $manualExercise->id,
+            'sort_order' => 2,
+            'duration_minutes' => 9,
+        ]);
+    }
+
+    public function test_invalid_combo_id_validation_fails(): void
+    {
+        $child = Child::factory()->create(['status' => 'active']);
+
+        $response = $this->post('/training', [
+            'child_id' => $child->id,
+            'session_date' => '2026-05-25',
+            'status' => 'planned',
+            'combo_ids' => [999999],
+        ]);
+
+        $response->assertSessionHasErrors(['combo_ids.0']);
+    }
+
     public function test_store_session_validation(): void
     {
         $response = $this->post('/training', [

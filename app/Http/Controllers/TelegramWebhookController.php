@@ -6,6 +6,7 @@ use App\Jobs\SendTelegramMessageJob;
 use App\Models\Child;
 use App\Services\TelegramTrainingNotificationService;
 use App\Services\TelegramService;
+use App\Services\TelegramReminderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -16,7 +17,8 @@ class TelegramWebhookController extends Controller
     public function __invoke(
         Request $request,
         TelegramService $telegramService,
-        TelegramTrainingNotificationService $trainingNotificationService
+        TelegramTrainingNotificationService $trainingNotificationService,
+        TelegramReminderService $reminderService
     ): JsonResponse
     {
         Log::info('Telegram webhook received', [
@@ -34,11 +36,11 @@ class TelegramWebhookController extends Controller
         $telegramService->processWebhook($request->all());
 
         if ($request->has('message')) {
-            $this->handleMessage($request, $telegramService, $trainingNotificationService);
+            $this->handleMessage($request, $telegramService, $trainingNotificationService, $reminderService);
         }
 
         if ($request->has('callback_query')) {
-            $this->handleCallback($request, $telegramService, $trainingNotificationService);
+            $this->handleCallback($request, $telegramService, $trainingNotificationService, $reminderService);
         }
 
         return response()->json(['ok' => true]);
@@ -61,7 +63,8 @@ class TelegramWebhookController extends Controller
     protected function handleMessage(
         Request $request,
         TelegramService $telegramService,
-        TelegramTrainingNotificationService $trainingNotificationService
+        TelegramTrainingNotificationService $trainingNotificationService,
+        TelegramReminderService $reminderService
     ): void
     {
         $chatId = $request->input('message.chat.id');
@@ -120,7 +123,8 @@ class TelegramWebhookController extends Controller
     protected function handleCallback(
         Request $request,
         TelegramService $telegramService,
-        TelegramTrainingNotificationService $trainingNotificationService
+        TelegramTrainingNotificationService $trainingNotificationService,
+        TelegramReminderService $reminderService
     ): void
     {
         $callbackQueryId = $request->input('callback_query.id');
@@ -149,6 +153,22 @@ class TelegramWebhookController extends Controller
             }
 
             $message = $trainingNotificationService->processCallback($request->input('callback_query', []));
+
+            return;
+        }
+
+        if (Str::startsWith($data, 'supplement_schedule:')) {
+            $parts = explode(':', $data);
+            $action = $parts[2] ?? '';
+
+            if ($callbackQueryId) {
+                $telegramService->answerCallbackQuery(
+                    $callbackQueryId,
+                    $reminderService->supplementCallbackFeedbackText($action)
+                );
+            }
+
+            $reminderService->handleSupplementCallback($request->input('callback_query', []));
 
             return;
         }
