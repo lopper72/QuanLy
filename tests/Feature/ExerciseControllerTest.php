@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Exercise;
+use App\Models\ExerciseCombo;
+use App\Models\WeeklyTrainingPlan;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
@@ -374,5 +376,114 @@ class ExerciseControllerTest extends TestCase
         $exercise->refresh();
         $this->assertSame('exercises/placeholders/gross_motor.svg', $exercise->thumbnail_path);
         Storage::disk('public')->assertExists('exercises/placeholders/gross_motor.svg');
+    }
+
+    public function test_categories_are_grouped_on_exercise_program_page(): void
+    {
+        Exercise::factory()->create([
+            'title' => 'Bật nhảy trên thảm',
+            'category' => 'gross_motor',
+            'is_active' => true,
+            'expected_benefits' => 'Cải thiện thăng bằng',
+        ]);
+        Exercise::factory()->create([
+            'title' => 'Xâu hạt lớn',
+            'category' => 'fine_motor',
+            'is_active' => true,
+        ]);
+
+        $response = $this->get('/exercises');
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Exercises/Index')
+            ->has('groupedExercises')
+            ->where('groupedExercises.0.key', 'gross_motor')
+            ->where('groupedExercises.0.label', 'Vận động thô')
+            ->has('groupedExercises.0.exercises', 1)
+        );
+    }
+
+    public function test_exercise_search_includes_benefits_and_guidance(): void
+    {
+        Exercise::factory()->create([
+            'title' => 'Bài vận động',
+            'expected_benefits' => 'Tăng khả năng chờ đến lượt',
+            'is_active' => true,
+        ]);
+        Exercise::factory()->create([
+            'title' => 'Bài khác',
+            'expected_benefits' => 'Tăng vận động thô',
+            'is_active' => true,
+        ]);
+
+        $response = $this->get('/exercises?search=chờ đến lượt');
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->has('exercises', 1)
+            ->where('exercises.0.title', 'Bài vận động')
+        );
+    }
+
+    public function test_combos_and_weekly_plans_load_on_program_page(): void
+    {
+        $exercise = Exercise::factory()->create(['is_active' => true]);
+        $combo = ExerciseCombo::create([
+            'title' => 'Combo tăng tập trung',
+            'slug' => 'combo-tang-tap-trung',
+            'target_skill' => 'attention',
+            'estimated_minutes' => 20,
+            'difficulty' => 'easy',
+        ]);
+        $combo->exercises()->attach($exercise->id, ['sort_order' => 1]);
+
+        $plan = WeeklyTrainingPlan::create([
+            'title' => 'Bé khó tập trung',
+            'slug' => 'be-kho-tap-trung',
+            'target_condition' => 'attention',
+            'recommended_age' => '3-6 tuổi',
+        ]);
+        $plan->items()->create([
+            'combo_id' => $combo->id,
+            'day_of_week' => 'monday',
+            'session_time' => 'morning',
+            'estimated_minutes' => 20,
+            'notes' => 'Mục tiêu: tăng chú ý.',
+        ]);
+
+        $response = $this->get('/exercises');
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->has('combos', 1)
+            ->where('combos.0.title', 'Combo tăng tập trung')
+            ->has('weeklyPlans', 1)
+            ->where('weeklyPlans.0.title', 'Bé khó tập trung')
+            ->where('weeklyPlans.0.items.0.combo.title', 'Combo tăng tập trung')
+        );
+    }
+
+    public function test_exercise_detail_shows_parent_guidance_sections(): void
+    {
+        $exercise = Exercise::factory()->create([
+            'expected_benefits' => 'Tăng chú ý khi gọi tên',
+            'parent_tips' => 'Tập ngắn và khen ngay khi bé phản hồi.',
+            'weekly_expectation' => 'Bé nhìn khi gọi tên nhiều hơn.',
+            'required_tools' => 'Bóng mềm',
+        ]);
+
+        $response = $this->get("/exercises/{$exercise->id}");
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Exercises/Show')
+            ->where('exercise.expected_benefits', 'Tăng chú ý khi gọi tên')
+            ->where('exercise.parent_tips', 'Tập ngắn và khen ngay khi bé phản hồi.')
+            ->where('exercise.weekly_expectation', 'Bé nhìn khi gọi tên nhiều hơn.')
+            ->has('relatedExercises')
+            ->has('suggestedCombos')
+            ->has('suggestedWeeklyPlans')
+        );
     }
 }

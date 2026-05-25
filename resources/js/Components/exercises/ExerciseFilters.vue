@@ -1,79 +1,76 @@
 <template>
-  <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-sm space-y-4">
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <!-- Search Input -->
+  <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
       <div>
-        <label for="search" class="block text-xs font-semibold text-slate-700 mb-1">Tìm kiếm</label>
-        <div class="relative rounded-md shadow-sm">
-          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-          <input
-            id="search"
-            v-model="localFilters.search"
-            type="text"
-            placeholder="Tìm kiếm bài tập..."
-            class="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-9 text-sm border-slate-300 rounded-md"
-            @input="debouncedFilter"
-          />
-        </div>
+        <label for="search" class="mb-1 block text-sm font-medium text-slate-700">Tìm kiếm</label>
+        <input
+          id="search"
+          v-model="localFilters.search"
+          type="text"
+          placeholder="Tên bài, lợi ích, hướng dẫn..."
+          class="block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+          @input="debouncedFilter"
+        />
       </div>
 
-      <!-- Category Filter -->
       <div>
-        <label for="category" class="block text-xs font-semibold text-slate-700 mb-1">Danh mục</label>
+        <label for="category" class="mb-1 block text-sm font-medium text-slate-700">Nhóm kỹ năng</label>
         <select
           id="category"
           v-model="localFilters.category"
-          class="focus:ring-indigo-500 focus:border-indigo-500 block w-full text-sm border-slate-300 rounded-md"
+          class="block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
           @change="emitFilter"
         >
-          <option value="">Tất cả danh mục</option>
-          <option v-for="(label, key) in categories" :key="key" :value="key">
-            {{ label }}
-          </option>
+          <option value="">Tất cả nhóm</option>
+          <option v-for="(label, key) in categories" :key="key" :value="key">{{ label }}</option>
         </select>
       </div>
 
-      <!-- Difficulty Filter -->
       <div>
-        <label for="difficulty" class="block text-xs font-semibold text-slate-700 mb-1">Độ khó</label>
+        <label for="target_skill" class="mb-1 block text-sm font-medium text-slate-700">Mục tiêu</label>
+        <select
+          id="target_skill"
+          v-model="localFilters.target_skill"
+          class="block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+          @change="emitFilter"
+        >
+          <option value="">Tất cả mục tiêu</option>
+          <option v-for="skill in targetSkills" :key="skill" :value="skill">{{ labelFor(skillLabels, skill, skill) }}</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="difficulty" class="mb-1 block text-sm font-medium text-slate-700">Độ khó</label>
         <select
           id="difficulty"
           v-model="localFilters.difficulty"
-          class="focus:ring-indigo-500 focus:border-indigo-500 block w-full text-sm border-slate-300 rounded-md"
+          class="block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
           @change="emitFilter"
         >
           <option value="">Tất cả độ khó</option>
-          <option v-for="(label, key) in difficulties" :key="key" :value="key">
-            {{ label }}
-          </option>
+          <option v-for="(label, key) in difficulties" :key="key" :value="key">{{ label }}</option>
         </select>
       </div>
 
-      <!-- Status Filter -->
       <div>
-        <label for="status" class="block text-xs font-semibold text-slate-700 mb-1">Trạng thái</label>
-        <select
-          id="status"
-          v-model="localFilters.is_active"
-          class="focus:ring-indigo-500 focus:border-indigo-500 block w-full text-sm border-slate-300 rounded-md"
-          @change="emitFilter"
-        >
-          <option value="">Tất cả trạng thái</option>
-          <option value="1">Kích hoạt</option>
-          <option value="0">Chưa kích hoạt</option>
-        </select>
+        <label for="age" class="mb-1 block text-sm font-medium text-slate-700">Tuổi của bé</label>
+        <input
+          id="age"
+          v-model="localFilters.age"
+          type="number"
+          min="1"
+          max="18"
+          placeholder="VD: 5"
+          class="block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+          @input="debouncedFilter"
+        />
       </div>
     </div>
 
-    <!-- Action Buttons -->
-    <div class="flex justify-end gap-2 pt-2 border-t border-slate-200">
+    <div class="mt-4 flex justify-end border-t border-slate-100 pt-3">
       <button
         type="button"
-        class="inline-flex items-center px-3 py-1.5 border border-slate-300 text-xs font-medium rounded text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
         @click="resetFilters"
       >
         Xóa bộ lọc
@@ -83,12 +80,13 @@
 </template>
 
 <script setup>
-import { reactive, watch } from 'vue';
+import { computed, reactive, watch } from 'vue';
+import { labelFor, skillLabels } from '@/Lib/labels';
 
 const props = defineProps({
   filters: {
     type: Object,
-    default: () => ({ search: '', category: '', difficulty: '', is_active: '' }),
+    default: () => ({ search: '', category: '', difficulty: '', target_skill: '', age: '', is_active: '' }),
   },
   categories: {
     type: Object,
@@ -106,8 +104,22 @@ const localFilters = reactive({
   search: props.filters.search ?? '',
   category: props.filters.category ?? '',
   difficulty: props.filters.difficulty ?? '',
+  target_skill: props.filters.target_skill ?? '',
+  age: props.filters.age ?? '',
   is_active: props.filters.is_active ?? '',
 });
+
+const targetSkills = computed(() => [
+  'gross_motor',
+  'fine_motor',
+  'communication',
+  'cognitive',
+  'sensory_processing',
+  'social_interaction',
+  'self_care',
+  'attention',
+  'self_regulation',
+]);
 
 watch(
   () => props.filters,
@@ -115,6 +127,8 @@ watch(
     localFilters.search = newFilters.search ?? '';
     localFilters.category = newFilters.category ?? '';
     localFilters.difficulty = newFilters.difficulty ?? '';
+    localFilters.target_skill = newFilters.target_skill ?? '';
+    localFilters.age = newFilters.age ?? '';
     localFilters.is_active = newFilters.is_active ?? '';
   },
   { deep: true }
@@ -123,12 +137,8 @@ watch(
 let timeoutId = null;
 
 const debouncedFilter = () => {
-  if (timeoutId) {
-    clearTimeout(timeoutId);
-  }
-  timeoutId = setTimeout(() => {
-    emitFilter();
-  }, 300);
+  clearTimeout(timeoutId);
+  timeoutId = setTimeout(emitFilter, 300);
 };
 
 const emitFilter = () => {
@@ -139,6 +149,8 @@ const resetFilters = () => {
   localFilters.search = '';
   localFilters.category = '';
   localFilters.difficulty = '';
+  localFilters.target_skill = '';
+  localFilters.age = '';
   localFilters.is_active = '';
   emitFilter();
 };

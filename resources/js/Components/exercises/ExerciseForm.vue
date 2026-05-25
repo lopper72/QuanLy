@@ -113,6 +113,56 @@
         <p v-if="form.errors.instructions" class="mt-1 text-sm text-rose-600">{{ form.errors.instructions }}</p>
       </div>
 
+      <div class="md:col-span-2 grid grid-cols-1 gap-6 border-t border-slate-100 pt-6 md:grid-cols-2">
+        <div>
+          <label for="description" class="block text-sm font-medium text-slate-700">Mô tả ngắn cho phụ huynh</label>
+          <textarea id="description" v-model="form.description" rows="3" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Bài tập này giúp bé luyện kỹ năng gì và nên tập khi nào..."></textarea>
+          <p v-if="form.errors.description" class="mt-1 text-sm text-rose-600">{{ form.errors.description }}</p>
+        </div>
+
+        <div>
+          <label for="target_skill" class="block text-sm font-medium text-slate-700">Mục tiêu phát triển</label>
+          <input id="target_skill" v-model="form.target_skill" type="text" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="VD: attention, communication, self_care" />
+          <p v-if="form.errors.target_skill" class="mt-1 text-sm text-rose-600">{{ form.errors.target_skill }}</p>
+        </div>
+
+        <div>
+          <label for="recommended_age" class="block text-sm font-medium text-slate-700">Độ tuổi gợi ý</label>
+          <input id="recommended_age" v-model="form.recommended_age" type="text" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="VD: 3-6 tuổi" />
+          <p v-if="form.errors.recommended_age" class="mt-1 text-sm text-rose-600">{{ form.errors.recommended_age }}</p>
+        </div>
+
+        <div>
+          <label for="required_tools" class="block text-sm font-medium text-slate-700">Dụng cụ cần chuẩn bị</label>
+          <textarea id="required_tools" v-model="form.required_tools" rows="3" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Thảm mềm, bóng, tranh ảnh..."></textarea>
+          <p v-if="form.errors.required_tools" class="mt-1 text-sm text-rose-600">{{ form.errors.required_tools }}</p>
+        </div>
+
+        <div>
+          <label for="expected_benefits" class="block text-sm font-medium text-slate-700">Lợi ích kỳ vọng</label>
+          <textarea id="expected_benefits" v-model="form.expected_benefits" rows="3" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Tăng chú ý, phối hợp tay mắt, giảm né tránh cảm giác..."></textarea>
+          <p v-if="form.errors.expected_benefits" class="mt-1 text-sm text-rose-600">{{ form.errors.expected_benefits }}</p>
+        </div>
+
+        <div>
+          <label for="weekly_expectation" class="block text-sm font-medium text-slate-700">Cải thiện sau 1 tuần</label>
+          <textarea id="weekly_expectation" v-model="form.weekly_expectation" rows="3" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Sau khoảng 1 tuần tập đều, bé có thể..."></textarea>
+          <p v-if="form.errors.weekly_expectation" class="mt-1 text-sm text-rose-600">{{ form.errors.weekly_expectation }}</p>
+        </div>
+
+        <div>
+          <label for="safety_notes" class="block text-sm font-medium text-slate-700">Lưu ý an toàn</label>
+          <textarea id="safety_notes" v-model="form.safety_notes" rows="3" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Khi nào cần dừng, người lớn cần quan sát gì..."></textarea>
+          <p v-if="form.errors.safety_notes" class="mt-1 text-sm text-rose-600">{{ form.errors.safety_notes }}</p>
+        </div>
+
+        <div>
+          <label for="parent_tips" class="block text-sm font-medium text-slate-700">Gợi ý cho phụ huynh</label>
+          <textarea id="parent_tips" v-model="form.parent_tips" rows="3" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Cách khuyến khích bé, cách giảm trợ giúp..."></textarea>
+          <p v-if="form.errors.parent_tips" class="mt-1 text-sm text-rose-600">{{ form.errors.parent_tips }}</p>
+        </div>
+      </div>
+
       <!-- Media Section -->
       <div class="md:col-span-2 border-t border-slate-100 pt-6">
         <h3 class="text-lg font-medium text-slate-900 mb-4">Hình ảnh & Video</h3>
@@ -300,6 +350,14 @@ const form = useForm({
   estimated_minutes: props.exercise?.estimated_minutes ?? '',
   is_active: props.exercise ? !!props.exercise.is_active : true,
   instructions: props.exercise?.instructions ?? '',
+  description: props.exercise?.description ?? '',
+  target_skill: props.exercise?.target_skill ?? '',
+  recommended_age: props.exercise?.recommended_age ?? '',
+  required_tools: props.exercise?.required_tools ?? '',
+  expected_benefits: props.exercise?.expected_benefits ?? '',
+  safety_notes: props.exercise?.safety_notes ?? '',
+  parent_tips: props.exercise?.parent_tips ?? '',
+  weekly_expectation: props.exercise?.weekly_expectation ?? '',
   thumbnail: null,
   video: null,
   video_url: props.exercise?.video_url ?? '',

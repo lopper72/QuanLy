@@ -16,6 +16,14 @@ class Exercise extends Model
         'category',
         'difficulty',
         'instructions',
+        'description',
+        'target_skill',
+        'recommended_age',
+        'required_tools',
+        'expected_benefits',
+        'safety_notes',
+        'parent_tips',
+        'weekly_expectation',
         'thumbnail_path',
         'video_path',
         'video_url',
@@ -36,6 +44,14 @@ class Exercise extends Model
     public function steps()
     {
         return $this->hasMany(ExerciseStep::class)->orderBy('sort_order');
+    }
+
+    public function combos()
+    {
+        return $this->belongsToMany(ExerciseCombo::class, 'exercise_combo_items', 'exercise_id', 'combo_id')
+            ->withPivot('sort_order')
+            ->withTimestamps()
+            ->orderByPivot('sort_order');
     }
 
     public function scopeActive($query)

@@ -25,15 +25,20 @@ class ExerciseController extends Controller
      */
     public function index(Request $request): Response
     {
-        $filters = $request->only(['search', 'category', 'difficulty', 'is_active']);
+        $filters = $request->only(['search', 'category', 'difficulty', 'target_skill', 'age', 'is_active']);
         $exercises = $this->exerciseService->listExercises($filters);
 
         return Inertia::render('Exercises/Index', [
             'exercises' => $exercises,
+            'groupedExercises' => $this->exerciseService->groupedExercises($exercises),
+            'combos' => $this->exerciseService->listCombos(),
+            'weeklyPlans' => $this->exerciseService->listWeeklyPlans(),
             'filters' => [
                 'search' => $filters['search'] ?? '',
                 'category' => $filters['category'] ?? '',
                 'difficulty' => $filters['difficulty'] ?? '',
+                'target_skill' => $filters['target_skill'] ?? '',
+                'age' => $filters['age'] ?? '',
                 'is_active' => $filters['is_active'] ?? '',
             ],
             'categories' => ExerciseService::CATEGORIES,
@@ -76,6 +81,9 @@ class ExerciseController extends Controller
 
         return Inertia::render('Exercises/Show', [
             'exercise' => $detailedExercise,
+            'relatedExercises' => $this->exerciseService->relatedExercises($exercise),
+            'suggestedCombos' => $detailedExercise->combos,
+            'suggestedWeeklyPlans' => $this->exerciseService->suggestedWeeklyPlans($exercise),
             'categories' => ExerciseService::CATEGORIES,
             'difficulties' => ExerciseService::DIFFICULTIES,
             'flash' => [

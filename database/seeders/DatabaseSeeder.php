@@ -10,19 +10,22 @@ use App\Models\Exercise;
 use App\Models\Report;
 use App\Models\TrainingSession;
 use App\Models\TrainingSessionItem;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
-    public function run()
+    public function run(): void
     {
-        // Create default test user for authentication
-        \App\Models\User::factory()->create([
-            'name' => 'Quản trị viên hệ thống',
-            'email' => 'admin@example.com',
-            'password' => \Illuminate\Support\Facades\Hash::make('password'),
-        ]);
+        User::updateOrCreate(
+            ['email' => 'admin@example.com'],
+            [
+                'name' => 'Quản trị viên hệ thống',
+                'password' => Hash::make('password'),
+            ]
+        );
 
         $childNames = [
             ['full_name' => 'Nguyễn Minh Anh', 'nickname' => 'Minh Anh', 'gender' => 'female', 'diagnosis_level' => 'mild'],
@@ -32,14 +35,15 @@ class DatabaseSeeder extends Seeder
         ];
 
         $children = collect();
-        foreach ($childNames as $c) {
-            $children->push(Child::factory()->create(array_merge($c, [
+        foreach ($childNames as $childData) {
+            $children->push(Child::factory()->create(array_merge($childData, [
                 'notes' => 'Bé hợp tác tốt hơn khi có phần thưởng nhỏ. Cần nhắc lại chỉ dẫn 2-3 lần. Bé dễ mất tập trung sau khoảng 10 phút.',
                 'status' => 'active',
             ])));
         }
 
-        $exercises = Exercise::factory()->count(20)->create();
+        $this->call(InterventionProgramSeeder::class);
+        $exercises = Exercise::active()->get();
 
         $sessions = collect();
         foreach (range(1, 14) as $index) {

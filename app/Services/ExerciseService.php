@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\Exercise;
+use App\Models\ExerciseCombo;
 use App\Models\ExerciseStep;
+use App\Models\WeeklyTrainingPlan;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -26,6 +28,26 @@ class ExerciseService
         'hard' => 'Khó',
     ];
 
+    public const CATEGORY_DESCRIPTIONS = [
+        'gross_motor' => 'Giúp cải thiện thăng bằng, phối hợp cơ thể và kiểm soát vận động.',
+        'fine_motor' => 'Rèn sự khéo léo của bàn tay, phối hợp tay mắt và chuẩn bị cho kỹ năng học tập.',
+        'sensory' => 'Hỗ trợ bé điều chỉnh cảm giác, giảm né tránh hoặc tìm kiếm kích thích quá mức.',
+        'communication' => 'Tăng chú ý chung, giao tiếp mắt, hiểu lời nói và chủ động tương tác.',
+        'cognitive' => 'Phát triển khả năng quan sát, ghi nhớ, phân loại và làm theo chỉ dẫn.',
+        'social' => 'Giúp bé biết chờ lượt, chơi cùng người khác và phản hồi phù hợp trong tình huống hằng ngày.',
+        'self_care' => 'Tập các kỹ năng tự lập như dọn dẹp, mặc đồ, vệ sinh và chuyển hoạt động.',
+    ];
+
+    public const CATEGORY_BENEFITS = [
+        'gross_motor' => ['Thăng bằng tốt hơn', 'Phối hợp tay chân', 'Tăng sức bền vận động'],
+        'fine_motor' => ['Cầm nắm chính xác', 'Phối hợp tay mắt', 'Tập trung lâu hơn'],
+        'sensory' => ['Điều chỉnh cảm giác', 'Giảm né tránh', 'Bình tĩnh hơn'],
+        'communication' => ['Tăng giao tiếp mắt', 'Hiểu chỉ dẫn', 'Chủ động gọi người lớn'],
+        'cognitive' => ['Nhận biết tốt hơn', 'Giải quyết vấn đề', 'Làm theo chuỗi bước'],
+        'social' => ['Chờ đến lượt', 'Chơi tương tác', 'Giảm phản ứng bốc đồng'],
+        'self_care' => ['Tự lập hơn', 'Theo nề nếp', 'Chuyển hoạt động dễ hơn'],
+    ];
+
     /**
      * List exercises with optional filters.
      */
@@ -37,7 +59,10 @@ class ExerciseService
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('instructions', 'like', "%{$search}%");
+                  ->orWhere('instructions', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhere('expected_benefits', 'like', "%{$search}%")
+                  ->orWhere('weekly_expectation', 'like', "%{$search}%");
             });
         }
 
@@ -49,6 +74,21 @@ class ExerciseService
             $query->where('difficulty', $filters['difficulty']);
         }
 
+        if (!empty($filters['target_skill'])) {
+            $query->where('target_skill', $filters['target_skill']);
+        }
+
+        if (!empty($filters['age'])) {
+            $age = (int) $filters['age'];
+            $query->where(function ($q) use ($age) {
+                $q->whereNull('recommended_age')
+                    ->orWhere('recommended_age', 'like', "%{$age}%")
+                    ->orWhere('recommended_age', 'like', '%3-6%')
+                    ->orWhere('recommended_age', 'like', '%4-7%')
+                    ->orWhere('recommended_age', 'like', '%5-8%');
+            });
+        }
+
         if (isset($filters['is_active']) && $filters['is_active'] !== '') {
             $isActive = filter_var($filters['is_active'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
             if ($isActive !== null) {
@@ -57,6 +97,37 @@ class ExerciseService
         }
 
         return $query->orderBy('title')->get();
+    }
+
+    public function groupedExercises(Collection $exercises): array
+    {
+        $grouped = $exercises->groupBy('category');
+
+        return collect(self::CATEGORIES)
+            ->map(fn (string $label, string $key) => [
+                'key' => $key,
+                'label' => $label,
+                'description' => self::CATEGORY_DESCRIPTIONS[$key] ?? '',
+                'benefits' => self::CATEGORY_BENEFITS[$key] ?? [],
+                'exercises' => $grouped->get($key, collect())->values(),
+                'count' => $grouped->get($key, collect())->count(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    public function listCombos(): Collection
+    {
+        return ExerciseCombo::with('exercises')
+            ->orderBy('title')
+            ->get();
+    }
+
+    public function listWeeklyPlans(): Collection
+    {
+        return WeeklyTrainingPlan::with(['items.exercise', 'items.combo'])
+            ->orderBy('title')
+            ->get();
     }
 
     /**
@@ -98,7 +169,28 @@ class ExerciseService
      */
     public function getExerciseDetail(Exercise $exercise): Exercise
     {
-        return $exercise->load('steps');
+        return $exercise->load(['steps', 'combos.exercises']);
+    }
+
+    public function relatedExercises(Exercise $exercise): Collection
+    {
+        return Exercise::query()
+            ->where('id', '!=', $exercise->id)
+            ->where('category', $exercise->category)
+            ->active()
+            ->orderBy('title')
+            ->limit(4)
+            ->get();
+    }
+
+    public function suggestedWeeklyPlans(Exercise $exercise): Collection
+    {
+        return WeeklyTrainingPlan::query()
+            ->where('target_condition', $exercise->target_skill)
+            ->orWhereHas('items', fn ($query) => $query->where('exercise_id', $exercise->id))
+            ->with(['items.exercise', 'items.combo'])
+            ->limit(3)
+            ->get();
     }
 
     /**

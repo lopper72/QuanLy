@@ -1,24 +1,20 @@
 <template>
   <AppLayout>
     <div class="space-y-6">
-      <!-- Breadcrumbs / Back button -->
-      <div class="flex items-center justify-between">
-        <Link href="/exercises" class="text-sm font-medium text-indigo-600 hover:text-indigo-900 flex items-center">
-          <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Quay lại thư viện bài tập
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Link href="/exercises" class="text-sm font-medium text-indigo-700 hover:text-indigo-900">
+          Quay lại chương trình can thiệp
         </Link>
-        <div class="flex space-x-3">
+        <div class="flex gap-2">
           <Link
             :href="`/exercises/${exercise.id}/edit`"
-            class="inline-flex items-center px-4 py-2 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            class="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
           >
-            Chỉnh sửa bài tập
+            Chỉnh sửa
           </Link>
           <button
             type="button"
-            class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500"
+            class="rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-rose-700"
             @click="deleteExercise"
           >
             Xóa bài tập
@@ -26,14 +22,11 @@
         </div>
       </div>
 
-      <!-- Main Info Card -->
-      <div class="bg-white overflow-hidden shadow sm:rounded-lg border border-slate-100">
-        <!-- Media Header -->
-        <div v-if="exercise.thumbnail_path || exercise.video_path || exercise.video_url" class="grid grid-cols-1 md:grid-cols-2 border-b border-slate-100">
-          <!-- Thumbnail/Video -->
-          <div class="bg-slate-900 flex items-center justify-center aspect-video">
+      <section class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div class="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr]">
+          <div class="flex min-h-72 items-center justify-center bg-slate-900">
             <template v-if="exercise.video_path">
-              <video controls class="w-full h-full">
+              <video controls class="h-full w-full">
                 <source :src="`/storage/${exercise.video_path}`" type="video/mp4">
                 Trình duyệt của bạn không hỗ trợ video.
               </video>
@@ -41,8 +34,9 @@
             <template v-else-if="exercise.video_url">
               <iframe
                 v-if="exercise.video_url.includes('youtube.com') || exercise.video_url.includes('youtu.be')"
-                class="w-full h-full"
+                class="h-full min-h-72 w-full"
                 :src="getYouTubeEmbedUrl(exercise.video_url)"
+                title="Video hướng dẫn"
                 frameborder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowfullscreen
@@ -50,123 +44,105 @@
               <a v-else :href="exercise.video_url" target="_blank" class="text-white underline">Xem video hướng dẫn</a>
             </template>
             <template v-else-if="exercise.thumbnail_path">
-              <img :src="`/storage/${exercise.thumbnail_path}`" class="w-full h-full object-contain" />
+              <img :src="`/storage/${exercise.thumbnail_path}`" class="h-full w-full object-contain" :alt="exercise.title" />
             </template>
-          </div>
-          
-          <!-- Quick Info -->
-          <div class="p-6 flex flex-col justify-center space-y-4">
-            <h1 class="text-3xl font-bold leading-tight text-slate-900">{{ exercise.title }}</h1>
-            <div class="flex flex-wrap gap-2">
-              <span
-                :class="[
-                  exercise.is_active ? 'bg-green-100 text-green-800 border-green-200' : 'bg-slate-100 text-slate-500 border-slate-200',
-                  'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border'
-                ]"
-              >
-                {{ exercise.is_active ? 'Kích hoạt' : 'Chưa kích hoạt' }}
-              </span>
-              <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200">
-                #{{ exercise.id }}
-              </span>
+            <div v-else class="p-8 text-center text-slate-200">
+              <p class="text-lg font-semibold">Khu vực hình ảnh hoặc video hướng dẫn</p>
+              <p class="mt-2 text-sm text-slate-400">Có thể bổ sung ảnh minh họa hoặc video khi cần.</p>
             </div>
-            <p class="text-slate-600">{{ exercise.instructions }}</p>
           </div>
-        </div>
 
-        <div v-else class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-          <div>
-            <h1 class="text-3xl font-bold leading-tight text-slate-900">{{ exercise.title }}</h1>
-            <p class="mt-1 text-sm text-slate-500">Mã bài tập: #{{ exercise.id }}</p>
-          </div>
-          <span
-            :class="[
-              exercise.is_active ? 'bg-green-100 text-green-800 border-green-200' : 'bg-slate-100 text-slate-500 border-slate-200',
-              'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border'
-            ]"
-          >
-            {{ exercise.is_active ? 'Kích hoạt' : 'Chưa kích hoạt' }}
-          </span>
-        </div>
-
-        <div class="px-6 py-5 space-y-6">
-          <!-- Metadata grid -->
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <!-- Category -->
-            <div class="p-4 bg-slate-50 rounded-lg border border-slate-100">
-              <span class="block text-xs font-semibold text-slate-500">Danh mục</span>
-              <span
-                :class="[
-                  categoryColor(exercise.category),
-                  'mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium border'
-                ]"
-              >
-                {{ getCategoryLabel(exercise.category) }}
-              </span>
-            </div>
-
-            <!-- Difficulty -->
-            <div class="p-4 bg-slate-50 rounded-lg border border-slate-100">
-              <span class="block text-xs font-semibold text-slate-500">Độ khó</span>
-              <span
-                v-if="exercise.difficulty"
-                :class="[
-                  difficultyColor(exercise.difficulty),
-                  'mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium border'
-                ]"
-              >
-                {{ getDifficultyLabel(exercise.difficulty) }}
-              </span>
-              <span v-else class="block mt-1 text-sm text-slate-400">Chưa xác định</span>
-            </div>
-
-            <!-- Estimated Minutes -->
-            <div class="p-4 bg-slate-50 rounded-lg border border-slate-100">
-              <span class="block text-xs font-semibold text-slate-500">Thời gian dự kiến</span>
-              <div class="mt-1 flex items-center text-slate-700 font-medium">
-                <svg class="w-4 h-4 mr-1 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {{ exercise.estimated_minutes ? `${exercise.estimated_minutes} phút` : 'Chưa xác định' }}
+          <div class="space-y-5 p-6">
+            <div>
+              <div class="mb-3 flex flex-wrap gap-2">
+                <span class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                  {{ labelFor(categoryLabels, exercise.category) }}
+                </span>
+                <span v-if="exercise.difficulty" class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                  {{ labelFor(difficultyLabels, exercise.difficulty) }}
+                </span>
+                <span v-if="exercise.estimated_minutes" class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                  {{ exercise.estimated_minutes }} phút
+                </span>
               </div>
+              <h1 class="text-3xl font-bold leading-tight text-slate-950">{{ exercise.title }}</h1>
+              <p class="mt-3 text-base leading-7 text-slate-600">{{ exercise.description || exercise.instructions }}</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <ExerciseInfoBox title="Phù hợp cho mục tiêu" :value="labelFor(skillLabels, exercise.target_skill, 'Đang cập nhật')" />
+              <ExerciseInfoBox title="Độ tuổi gợi ý" :value="exercise.recommended_age || 'Theo khả năng của bé'" />
+              <ExerciseInfoBox title="Dụng cụ cần chuẩn bị" :value="exercise.required_tools || 'Đồ dùng đơn giản trong gia đình'" />
+              <ExerciseInfoBox title="Trạng thái" :value="exercise.is_active ? 'Đang sử dụng' : 'Tạm ẩn'" />
             </div>
           </div>
+        </div>
+      </section>
 
-          <!-- URL / Slug -->
-          <div v-if="exercise.slug" class="px-4 py-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center space-x-2">
-            <span class="text-xs font-semibold text-slate-500">Đường dẫn:</span>
-            <code class="text-xs text-indigo-600">{{ exercise.slug }}</code>
-          </div>
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
+        <main class="space-y-6">
+          <ExerciseDetailSection title="Lợi ích của bài tập" :content="exercise.expected_benefits" fallback="Bài tập giúp bé luyện kỹ năng nền tảng và tăng khả năng hợp tác trong sinh hoạt hằng ngày." />
+          <ExerciseDetailSection title="Hướng dẫn cho phụ huynh" :content="exercise.parent_tips" fallback="Tập ngắn, vui vẻ, khen đúng lúc và giảm yêu cầu khi bé căng thẳng." />
+          <ExerciseDetailSection title="Sau khoảng 1 tuần tập đều, bé có thể cải thiện" :content="exercise.weekly_expectation" fallback="Bé có thể chú ý tốt hơn, hợp tác hơn và quen dần với hoạt động." />
+          <ExerciseDetailSection title="Lưu ý an toàn" :content="exercise.safety_notes" fallback="Luôn có người lớn quan sát và dừng lại nếu bé khó chịu hoặc mệt." />
 
-          <!-- Steps -->
-          <div v-if="exercise.steps && exercise.steps.length > 0" class="space-y-4">
-            <h2 class="text-xl font-bold text-slate-900 border-b border-slate-100 pb-2">Quy trình thực hiện</h2>
-            <div class="grid grid-cols-1 gap-6">
-              <div v-for="(step, index) in exercise.steps" :key="step.id" class="flex flex-col md:flex-row gap-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                <div class="flex-shrink-0">
-                  <div class="h-10 w-10 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-lg">
-                    {{ index + 1 }}
-                  </div>
+          <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="text-lg font-semibold text-slate-950">Các bước thực hiện</h2>
+            <div v-if="exercise.steps?.length" class="mt-4 space-y-4">
+              <div v-for="(step, index) in exercise.steps" :key="step.id" class="flex gap-4 rounded-lg bg-slate-50 p-4">
+                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white">
+                  {{ index + 1 }}
                 </div>
-                <div class="flex-grow space-y-2">
-                  <h3 class="text-lg font-bold text-slate-800">{{ step.title }}</h3>
-                  <p class="text-slate-600 leading-relaxed">{{ step.instruction }}</p>
-                </div>
-                <div v-if="step.image_path" class="md:w-1/3 flex-shrink-0">
-                  <img :src="`/storage/${step.image_path}`" class="w-full rounded-lg shadow-sm border border-slate-200" />
+                <div>
+                  <h3 class="font-semibold text-slate-900">{{ step.title }}</h3>
+                  <p class="mt-1 text-sm leading-6 text-slate-600">{{ step.instruction }}</p>
                 </div>
               </div>
             </div>
-          </div>
-
-          <!-- Instructions (Fallback if no steps) -->
-          <div v-else-if="exercise.instructions" class="space-y-2">
-            <h2 class="text-lg font-bold text-slate-900 border-b border-slate-100 pb-2">Hướng dẫn chi tiết</h2>
-            <div class="text-slate-700 whitespace-pre-wrap leading-relaxed p-4 bg-slate-50 border border-slate-100 rounded-lg">
-              {{ exercise.instructions }}
+            <div v-else class="mt-4 whitespace-pre-wrap rounded-lg bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+              {{ exercise.instructions || 'Hướng dẫn chi tiết đang được cập nhật.' }}
             </div>
-          </div>
-        </div>
+          </section>
+        </main>
+
+        <aside class="space-y-6">
+          <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="text-lg font-semibold text-slate-950">Combo gợi ý</h2>
+            <div v-if="suggestedCombos.length" class="mt-3 space-y-3">
+              <div v-for="combo in suggestedCombos" :key="combo.id" class="rounded-md bg-slate-50 p-3">
+                <p class="font-medium text-slate-900">{{ combo.title }}</p>
+                <p class="mt-1 text-sm text-slate-600">{{ combo.estimated_minutes || 0 }} phút · {{ combo.recommended_frequency || 'Tập đều trong tuần' }}</p>
+              </div>
+            </div>
+            <p v-else class="mt-3 text-sm text-slate-500">Chưa có combo liên quan.</p>
+          </section>
+
+          <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="text-lg font-semibold text-slate-950">Bài tập liên quan</h2>
+            <div v-if="relatedExercises.length" class="mt-3 space-y-3">
+              <Link
+                v-for="item in relatedExercises"
+                :key="item.id"
+                :href="`/exercises/${item.id}`"
+                class="block rounded-md bg-slate-50 p-3 text-sm font-medium text-slate-800 hover:bg-slate-100"
+              >
+                {{ item.title }}
+              </Link>
+            </div>
+            <p v-else class="mt-3 text-sm text-slate-500">Chưa có bài tập liên quan.</p>
+          </section>
+
+          <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="text-lg font-semibold text-slate-950">Lịch mẫu phù hợp</h2>
+            <div v-if="suggestedWeeklyPlans.length" class="mt-3 space-y-3">
+              <div v-for="plan in suggestedWeeklyPlans" :key="plan.id" class="rounded-md bg-slate-50 p-3">
+                <p class="font-medium text-slate-900">{{ plan.title }}</p>
+                <p class="mt-1 text-sm leading-6 text-slate-600">{{ plan.description }}</p>
+              </div>
+            </div>
+            <p v-else class="mt-3 text-sm text-slate-500">Chưa có lịch mẫu phù hợp.</p>
+          </section>
+        </aside>
       </div>
     </div>
   </AppLayout>
@@ -175,67 +151,28 @@
 <script setup>
 import { Link, router } from '@inertiajs/vue3';
 import AppLayout from '../../Components/layout/AppLayout.vue';
+import ExerciseDetailSection from '../../Components/exercises/ExerciseDetailSection.vue';
+import ExerciseInfoBox from '../../Components/exercises/ExerciseInfoBox.vue';
+import { categoryLabels, difficultyLabels, labelFor, skillLabels } from '@/Lib/labels';
 
 const props = defineProps({
   exercise: {
     type: Object,
     required: true,
   },
-  categories: {
-    type: Object,
-    default: () => ({}),
+  relatedExercises: {
+    type: Array,
+    default: () => [],
   },
-  difficulties: {
-    type: Object,
-    default: () => ({}),
+  suggestedCombos: {
+    type: Array,
+    default: () => [],
+  },
+  suggestedWeeklyPlans: {
+    type: Array,
+    default: () => [],
   },
 });
-
-const defaultCategories = {
-  gross_motor: 'Vận động thô',
-  fine_motor: 'Vận động tinh',
-  sensory: 'Giác quan',
-  communication: 'Giao tiếp',
-  cognitive: 'Nhận thức',
-  social: 'Xã hội',
-  self_care: 'Tự chăm sóc',
-};
-
-const defaultDifficulties = {
-  easy: 'Dễ',
-  medium: 'Trung bình',
-  hard: 'Khó',
-};
-
-const getCategoryLabel = (cat) => {
-  return props.categories[cat] || defaultCategories[cat] || cat;
-};
-
-const getDifficultyLabel = (diff) => {
-  return props.difficulties[diff] || defaultDifficulties[diff] || diff;
-};
-
-const categoryColor = (cat) => {
-  const colors = {
-    gross_motor: 'bg-blue-50 text-blue-700 border-blue-200',
-    fine_motor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    sensory: 'bg-purple-50 text-purple-700 border-purple-200',
-    communication: 'bg-amber-50 text-amber-700 border-amber-200',
-    cognitive: 'bg-pink-50 text-pink-700 border-pink-200',
-    social: 'bg-sky-50 text-sky-700 border-sky-200',
-    self_care: 'bg-teal-50 text-teal-700 border-teal-200',
-  };
-  return colors[cat] || 'bg-slate-50 text-slate-700 border-slate-200';
-};
-
-const difficultyColor = (diff) => {
-  const colors = {
-    easy: 'bg-green-50 text-green-700 border-green-200',
-    medium: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-    hard: 'bg-red-50 text-red-700 border-red-200',
-  };
-  return colors[diff] || 'bg-slate-50 text-slate-700 border-slate-200';
-};
 
 const getYouTubeEmbedUrl = (url) => {
   let videoId = '';
@@ -248,7 +185,7 @@ const getYouTubeEmbedUrl = (url) => {
 };
 
 const deleteExercise = () => {
-  if (confirm('Bạn có chắc chắn muốn xóa vĩnh viễn bài tập này không?')) {
+  if (confirm('Bạn có chắc muốn xóa bài tập này không?')) {
     router.delete(`/exercises/${props.exercise.id}`);
   }
 };
