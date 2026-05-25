@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Child;
+use Faker\Factory as FakerFactory;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class ChildFactory extends Factory
@@ -11,7 +12,7 @@ class ChildFactory extends Factory
 
     public function definition(): array
     {
-        $faker = fake('vi_VN');
+        $faker = FakerFactory::create('vi_VN');
 
         $vietnameseNames = [
             'Nguyễn Minh Anh',
