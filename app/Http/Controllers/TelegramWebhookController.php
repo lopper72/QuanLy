@@ -131,7 +131,7 @@ class TelegramWebhookController extends Controller
             return;
         }
 
-        if (Str::startsWith($data, 'training_session:')) {
+        if (Str::startsWith($data, 'training_session:') || Str::startsWith($data, 'training_item:')) {
             $parts = explode(':', $data);
             $action = $parts[2] ?? '';
             Log::info('Telegram training callback dispatch', [

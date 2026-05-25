@@ -88,7 +88,7 @@ class TelegramTrainingNotificationService
     {
         $data = (string) ($callback['data'] ?? '');
 
-        if (!preg_match('/^training_session:(\d+):(completed|not_completed|skipped|need_help)$/', $data, $matches)) {
+        if (!preg_match('/^training_(session|item):(\d+):(completed|not_completed|skipped|need_help)$/', $data, $matches)) {
             Log::info('Telegram training callback ignored', [
                 'callback_data' => $data,
             ]);
@@ -96,17 +96,29 @@ class TelegramTrainingNotificationService
             return null;
         }
 
-        $session = TrainingSession::with(['child', 'items.exercise'])->find((int) $matches[1]);
+        $targetType = $matches[1];
+        $targetId = (int) $matches[2];
+        $action = $matches[3];
+        $item = null;
+        $session = null;
+
+        if ($targetType === 'item') {
+            $item = \App\Models\TrainingSessionItem::with(['trainingSession.child', 'exercise'])->find($targetId);
+            $session = $item?->trainingSession;
+        } else {
+            $session = TrainingSession::with(['child', 'items.exercise'])->find($targetId);
+        }
+
         if (!$session) {
             Log::info('Telegram training callback session not found', [
                 'callback_data' => $data,
-                'session_id' => $matches[1],
+                'target_type' => $targetType,
+                'target_id' => $targetId,
             ]);
 
             return null;
         }
 
-        $action = $matches[2];
         $message = $callback['message'] ?? [];
         $chat = $message['chat'] ?? [];
         $from = $callback['from'] ?? [];
@@ -119,12 +131,16 @@ class TelegramTrainingNotificationService
         Log::info('Telegram training callback received', [
             'callback_data' => $data,
             'session_id' => $session->id,
+            'item_id' => $item?->id,
             'action' => $action,
             'status_before' => $beforeStatus,
         ]);
 
-        $afterStatus = $this->applyActionToSession($session, $action);
+        $afterStatus = $item
+            ? $this->applyActionToItem($item, $action)
+            : $this->applyActionToSession($session, $action);
         $label = $this->actionLabel($action);
+        $targetLabel = $item?->exercise?->title ?: 'buổi tập';
 
         $inbound = TelegramMessage::create([
             'direction' => TelegramMessage::DIRECTION_INBOUND,
@@ -132,13 +148,15 @@ class TelegramTrainingNotificationService
             'telegram_user_id' => isset($from['id']) ? (string) $from['id'] : null,
             'telegram_username' => $from['username'] ?? $chat['username'] ?? null,
             'message_type' => 'training_callback',
-            'message_text' => "Đã bấm: {$label}",
+            'message_text' => "Đã bấm: {$label} - {$targetLabel}",
             'callback_data' => $data,
             'action_status' => $action,
             'payload_json' => [
                 'callback' => $callback,
                 'status_before' => $beforeStatus,
                 'status_after' => $afterStatus,
+                'target_type' => $targetType,
+                'target_id' => $targetId,
             ],
             'delivery_status' => TelegramMessage::STATUS_RECEIVED,
             'received_at' => $receivedAt,
@@ -154,6 +172,7 @@ class TelegramTrainingNotificationService
         Log::info('Telegram training callback processed', [
             'callback_data' => $data,
             'session_id' => $session->id,
+            'item_id' => $item?->id,
             'action' => $action,
             'status_before' => $beforeStatus,
             'status_after' => $afterStatus,
@@ -196,6 +215,10 @@ class TelegramTrainingNotificationService
 
         $index = 1;
         foreach ($sessions as $session) {
+            if ($session->scheduled_time) {
+                $lines[] = 'Giờ tập: '.substr((string) $session->scheduled_time, 0, 5);
+            }
+
             foreach ($session->items as $item) {
                 $exerciseTitle = $item->exercise?->title ?: 'Bài tập chưa xác định';
                 $minutes = $item->duration_minutes ?: $item->exercise?->estimated_minutes ?: 0;
@@ -217,17 +240,35 @@ class TelegramTrainingNotificationService
     public function trainingKeyboard(TrainingSession $session): array
     {
         return [
-            'inline_keyboard' => [
-                [
-                    ['text' => '✅ Đã hoàn thành', 'callback_data' => "training_session:{$session->id}:completed"],
-                    ['text' => '⏳ Chưa hoàn thành', 'callback_data' => "training_session:{$session->id}:not_completed"],
-                ],
-                [
-                    ['text' => '⏭ Bỏ qua hôm nay', 'callback_data' => "training_session:{$session->id}:skipped"],
-                    ['text' => '💬 Cần hỗ trợ', 'callback_data' => "training_session:{$session->id}:need_help"],
-                ],
-            ],
+            'inline_keyboard' => $this->trainingItemKeyboardRows($session),
         ];
+    }
+
+    protected function trainingItemKeyboardRows(TrainingSession $session): array
+    {
+        $session->loadMissing('items.exercise');
+        $rows = [];
+
+        foreach ($session->items->sortBy('sort_order')->values() as $index => $item) {
+            $number = $index + 1;
+            $rows[] = [
+                ['text' => "{$number} ✅ Hoàn thành", 'callback_data' => "training_item:{$item->id}:completed"],
+                ['text' => "{$number} ⏳ Chưa hoàn thành", 'callback_data' => "training_item:{$item->id}:not_completed"],
+            ];
+            $rows[] = [
+                ['text' => "{$number} ⏭ Bỏ qua", 'callback_data' => "training_item:{$item->id}:skipped"],
+                ['text' => "{$number} 💬 Hỗ trợ", 'callback_data' => "training_item:{$item->id}:need_help"],
+            ];
+        }
+
+        if ($rows === []) {
+            $rows[] = [
+                ['text' => '✅ Đã hoàn thành', 'callback_data' => "training_session:{$session->id}:completed"],
+                ['text' => '💬 Cần hỗ trợ', 'callback_data' => "training_session:{$session->id}:need_help"],
+            ];
+        }
+
+        return $rows;
     }
 
     public function actionLabel(string $action): string
@@ -288,6 +329,52 @@ class TelegramTrainingNotificationService
                     'completion_status' => 'missed',
                 ]);
             }
+
+            return $status;
+        });
+    }
+
+    protected function applyActionToItem(\App\Models\TrainingSessionItem $item, string $action): string
+    {
+        return DB::transaction(function () use ($item, $action) {
+            $itemStatus = match ($action) {
+                self::ACTION_COMPLETED => 'completed',
+                self::ACTION_NOT_COMPLETED => 'partially_completed',
+                self::ACTION_SKIPPED => 'skipped',
+                self::ACTION_NEED_HELP => 'partially_completed',
+            };
+
+            $payload = ['completion_status' => $itemStatus];
+            if ($action === self::ACTION_NEED_HELP) {
+                $payload['therapist_note'] = trim(($item->therapist_note ? $item->therapist_note.PHP_EOL : '').'Phụ huynh cần hỗ trợ qua Telegram.');
+            }
+
+            $item->update($payload);
+
+            $session = $item->trainingSession()->with('items')->first();
+            if (!$session) {
+                return 'planned';
+            }
+
+            if ($action === self::ACTION_NEED_HELP) {
+                $session->update(['status' => 'need_help']);
+
+                return 'need_help';
+            }
+
+            $items = $session->items;
+            $allCompleted = $items->isNotEmpty() && $items->every(fn ($sessionItem) => $sessionItem->completion_status === 'completed');
+            $allSkipped = $items->isNotEmpty() && $items->every(fn ($sessionItem) => $sessionItem->completion_status === 'skipped');
+            $allProcessed = $items->isNotEmpty() && $items->every(fn ($sessionItem) => in_array($sessionItem->completion_status, ['completed', 'skipped'], true));
+
+            $status = match (true) {
+                $allCompleted => 'completed',
+                $allSkipped => 'skipped',
+                $allProcessed => 'completed',
+                default => 'in_progress',
+            };
+
+            $session->update(['status' => $status]);
 
             return $status;
         });

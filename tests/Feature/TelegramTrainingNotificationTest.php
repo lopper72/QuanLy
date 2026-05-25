@@ -35,7 +35,8 @@ class TelegramTrainingNotificationTest extends TestCase
             ->assertRedirect();
 
         Http::assertSent(fn ($request) => str_contains($request['text'], "Lịch tập hôm nay của bé {$child->full_name}")
-            && str_contains(json_encode($request['reply_markup'], JSON_UNESCAPED_UNICODE), 'training_session:'));
+            && str_contains($request['text'], 'Giờ tập: 08:00')
+            && str_contains(json_encode($request['reply_markup'], JSON_UNESCAPED_UNICODE), 'training_item:'));
     }
 
     public function test_outbound_telegram_message_is_logged(): void
@@ -123,6 +124,55 @@ class TelegramTrainingNotificationTest extends TestCase
         $this->assertDatabaseMissing('training_sessions', [
             'id' => $session->id,
             'status' => 'completed',
+        ]);
+    }
+
+    public function test_item_callback_updates_only_one_training_item(): void
+    {
+        $this->configureTelegram();
+        $child = $this->createTodayTraining();
+        $session = $child->trainingSessions()->with('items')->first();
+        $firstItem = $session->items->first();
+        $secondExercise = Exercise::factory()->create(['title' => 'Cất đồ chơi sau khi chơi']);
+        $secondItem = TrainingSessionItem::factory()->create([
+            'training_session_id' => $session->id,
+            'exercise_id' => $secondExercise->id,
+            'duration_minutes' => 8,
+            'completion_status' => 'not_started',
+        ]);
+
+        $this->postTrainingItemCallback($firstItem, 'completed')->assertOk();
+
+        $this->assertDatabaseHas('training_session_items', [
+            'id' => $firstItem->id,
+            'completion_status' => 'completed',
+        ]);
+        $this->assertDatabaseHas('training_session_items', [
+            'id' => $secondItem->id,
+            'completion_status' => 'not_started',
+        ]);
+        $this->assertDatabaseHas('training_sessions', [
+            'id' => $session->id,
+            'status' => 'in_progress',
+        ]);
+    }
+
+    public function test_item_need_help_marks_session_need_help_without_completing_all_items(): void
+    {
+        $this->configureTelegram();
+        $child = $this->createTodayTraining();
+        $session = $child->trainingSessions()->with('items')->first();
+        $item = $session->items->first();
+
+        $this->postTrainingItemCallback($item, 'need_help')->assertOk();
+
+        $this->assertDatabaseHas('training_session_items', [
+            'id' => $item->id,
+            'completion_status' => 'partially_completed',
+        ]);
+        $this->assertDatabaseHas('training_sessions', [
+            'id' => $session->id,
+            'status' => 'need_help',
         ]);
     }
 
@@ -240,6 +290,27 @@ class TelegramTrainingNotificationTest extends TestCase
             'callback_query' => [
                 'id' => 'cb123',
                 'data' => "training_session:{$session->id}:{$action}",
+                'from' => [
+                    'id' => 987654,
+                    'username' => 'parent_user',
+                    'first_name' => 'Phụ huynh',
+                ],
+                'message' => [
+                    'date' => now()->timestamp,
+                    'chat' => ['id' => 123456],
+                ],
+            ],
+        ], ['X-Telegram-Bot-Api-Secret-Token' => 'test-secret']);
+    }
+
+    private function postTrainingItemCallback(TrainingSessionItem $item, string $action)
+    {
+        Http::fake(['api.telegram.org/*' => Http::response(['ok' => true], 200)]);
+
+        return $this->postJson('/telegram/webhook', [
+            'callback_query' => [
+                'id' => 'cb-item',
+                'data' => "training_item:{$item->id}:{$action}",
                 'from' => [
                     'id' => 987654,
                     'username' => 'parent_user',
