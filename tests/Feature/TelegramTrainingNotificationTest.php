@@ -174,6 +174,29 @@ class TelegramTrainingNotificationTest extends TestCase
             );
     }
 
+    public function test_today_telegram_command_sends_today_training_schedule(): void
+    {
+        Http::fake(['api.telegram.org/*' => Http::response(['ok' => true], 200)]);
+        $child = $this->createTodayTraining();
+        $this->configureTelegram();
+
+        $this->postJson('/telegram/webhook', [
+            'message' => [
+                'date' => now()->timestamp,
+                'text' => '/today',
+                'chat' => ['id' => 6005717884],
+                'from' => ['id' => 6005717884, 'first_name' => 'Phụ huynh'],
+            ],
+        ], ['X-Telegram-Bot-Api-Secret-Token' => 'test-secret'])->assertOk();
+
+        $this->assertDatabaseHas('telegram_messages', [
+            'direction' => TelegramMessage::DIRECTION_OUTBOUND,
+            'telegram_chat_id' => '6005717884',
+            'message_type' => 'training_schedule',
+            'related_child_id' => $child->id,
+        ]);
+    }
+
     private function configureTelegram(): void
     {
         TelegramSetting::query()->create([

@@ -25,6 +25,16 @@ class TelegramTrainingNotificationService
 
     public function sendTodayTraining(Child $child): TelegramMessage
     {
+        $chatId = $this->resolveChatId();
+        if (blank($chatId)) {
+            throw new InvalidArgumentException('Chưa có mã hội thoại Telegram cho phụ huynh.');
+        }
+
+        return $this->sendTodayTrainingToChat($child, $chatId);
+    }
+
+    public function sendTodayTrainingToChat(Child $child, string|int $chatId): TelegramMessage
+    {
         $child->loadMissing(['trainingSessions.items.exercise']);
 
         if ($child->isVoided()) {
@@ -39,7 +49,6 @@ class TelegramTrainingNotificationService
             throw new InvalidArgumentException('Chưa cấu hình bot Telegram.');
         }
 
-        $chatId = $this->resolveChatId();
         if (blank($chatId)) {
             throw new InvalidArgumentException('Chưa có mã hội thoại Telegram cho phụ huynh.');
         }

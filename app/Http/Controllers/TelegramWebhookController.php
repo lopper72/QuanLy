@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\SendTelegramMessageJob;
+use App\Models\Child;
 use App\Services\TelegramTrainingNotificationService;
 use App\Services\TelegramService;
 use Illuminate\Http\JsonResponse;
@@ -33,7 +34,7 @@ class TelegramWebhookController extends Controller
         $telegramService->processWebhook($request->all());
 
         if ($request->has('message')) {
-            $this->handleMessage($request, $telegramService);
+            $this->handleMessage($request, $telegramService, $trainingNotificationService);
         }
 
         if ($request->has('callback_query')) {
@@ -57,7 +58,11 @@ class TelegramWebhookController extends Controller
         ));
     }
 
-    protected function handleMessage(Request $request, TelegramService $telegramService): void
+    protected function handleMessage(
+        Request $request,
+        TelegramService $telegramService,
+        TelegramTrainingNotificationService $trainingNotificationService
+    ): void
     {
         $chatId = $request->input('message.chat.id');
         $text = trim((string) $request->input('message.text', ''));
@@ -76,6 +81,30 @@ class TelegramWebhookController extends Controller
                     'Đã kết nối Telegram. Bạn sẽ nhận nhắc lịch checklist hằng ngày.',
                     $telegramService->openChecklistKeyboard()
                 );
+            }
+
+            return;
+        }
+
+        if ($text === '/today') {
+            $children = Child::query()
+                ->active()
+                ->whereHas('trainingSessions', fn ($query) => $query->whereDate('session_date', today()))
+                ->orderBy('full_name')
+                ->get();
+
+            if ($children->isEmpty()) {
+                $telegramService->sendMessage((string) $chatId, 'Hôm nay chưa có lịch tập nào.');
+
+                return;
+            }
+
+            foreach ($children as $child) {
+                try {
+                    $trainingNotificationService->sendTodayTrainingToChat($child, (string) $chatId);
+                } catch (\InvalidArgumentException $exception) {
+                    $telegramService->sendMessage((string) $chatId, $exception->getMessage());
+                }
             }
 
             return;
