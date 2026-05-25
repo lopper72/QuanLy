@@ -213,6 +213,88 @@ class TelegramService
         return Http::timeout(10)->get("https://api.telegram.org/bot{$token}/getWebhookInfo");
     }
 
+    public function setWebhook(?string $url = null, ?string $secret = null): ?Response
+    {
+        $token = $this->botToken();
+        $url ??= $this->webhookUrl();
+        $secret ??= $this->webhookSecret();
+
+        if (blank($token) || blank($url)) {
+            Log::info('Telegram setWebhook skipped', [
+                'has_token' => filled($token),
+                'has_url' => filled($url),
+            ]);
+
+            return null;
+        }
+
+        $payload = [
+            'url' => $url,
+            'allowed_updates' => ['message', 'callback_query'],
+            'drop_pending_updates' => false,
+        ];
+
+        if (filled($secret)) {
+            $payload['secret_token'] = $secret;
+        }
+
+        $response = Http::timeout(15)->post("https://api.telegram.org/bot{$token}/setWebhook", $payload);
+
+        Log::info('Telegram setWebhook response', [
+            'webhook_url' => $url,
+            'successful' => $response->successful(),
+            'status' => $response->status(),
+            'response' => $response->json(),
+        ]);
+
+        return $response;
+    }
+
+    public function deleteWebhook(bool $dropPendingUpdates = false): ?Response
+    {
+        $token = $this->botToken();
+        if (blank($token)) {
+            return null;
+        }
+
+        $response = Http::timeout(15)->post("https://api.telegram.org/bot{$token}/deleteWebhook", [
+            'drop_pending_updates' => $dropPendingUpdates,
+        ]);
+
+        Log::info('Telegram deleteWebhook response', [
+            'drop_pending_updates' => $dropPendingUpdates,
+            'successful' => $response->successful(),
+            'status' => $response->status(),
+            'response' => $response->json(),
+        ]);
+
+        return $response;
+    }
+
+    public function editMessageReplyMarkup(string|int $chatId, string|int $messageId, array $replyMarkup = []): ?Response
+    {
+        $token = $this->botToken();
+        if (blank($token) || blank($chatId) || blank($messageId)) {
+            return null;
+        }
+
+        $response = Http::timeout(10)->post("https://api.telegram.org/bot{$token}/editMessageReplyMarkup", [
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+            'reply_markup' => $replyMarkup,
+        ]);
+
+        Log::info('Telegram editMessageReplyMarkup response', [
+            'chat_id' => (string) $chatId,
+            'message_id' => (string) $messageId,
+            'successful' => $response->successful(),
+            'status' => $response->status(),
+            'response' => $response->json(),
+        ]);
+
+        return $response;
+    }
+
     public function queueChecklistReminder(ChecklistItem $item, User $user): void
     {
         $item->loadMissing(['dailyChecklist.child', 'trainingSessionItem.exercise', 'trainingSessionItem.trainingSession']);
@@ -366,6 +448,13 @@ class TelegramService
         $setting = TelegramSetting::query()->first();
 
         return $setting?->webhook_secret ?: config('services.telegram.webhook_secret');
+    }
+
+    public function webhookUrl(): ?string
+    {
+        $setting = TelegramSetting::query()->first();
+
+        return $setting?->webhook_url ?: config('services.telegram.webhook_url');
     }
 
     public function deliverLoggedMessage(TelegramMessage $message, array $replyMarkup = []): ?Response

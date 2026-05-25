@@ -18,6 +18,7 @@
         <TelegramMessageTimeline :messages="messages" :selected-chat-id="selectedChatId" />
 
         <div class="space-y-4">
+          <TelegramSystemStatusCard :status="systemStatus" />
           <TelegramSettingsCard :settings="settings" />
           <section class="rounded-lg bg-white p-4 ring-1 ring-gray-200">
             <h2 class="text-base font-semibold text-gray-900">Theo dõi</h2>
@@ -48,6 +49,7 @@ import TelegramContactSidebar from '@/Components/telegram/TelegramContactSidebar
 import TelegramMessageTimeline from '@/Components/telegram/TelegramMessageTimeline.vue';
 import TelegramQuickSend from '@/Components/telegram/TelegramQuickSend.vue';
 import TelegramSettingsCard from '@/Components/telegram/TelegramSettingsCard.vue';
+import TelegramSystemStatusCard from '@/Components/telegram/TelegramSystemStatusCard.vue';
 import TelegramTestPanel from '@/Components/telegram/TelegramTestPanel.vue';
 import TelegramTwoWayTestPanel from '@/Components/telegram/TelegramTwoWayTestPanel.vue';
 
@@ -73,6 +75,10 @@ defineProps({
     required: true,
   },
   trainingTest: {
+    type: Object,
+    required: true,
+  },
+  systemStatus: {
     type: Object,
     required: true,
   },

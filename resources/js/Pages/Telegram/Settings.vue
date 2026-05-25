@@ -11,7 +11,7 @@
       <form class="rounded-lg bg-white p-6 ring-1 ring-gray-200" @submit.prevent="submit">
         <div class="grid gap-5">
           <div>
-            <label class="block text-sm font-medium text-gray-700" for="bot-token">Bot token</label>
+            <label class="block text-sm font-medium text-gray-700" for="bot-token">Mã token bot</label>
             <input
               id="bot-token"
               v-model="form.bot_token"
@@ -24,7 +24,7 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700" for="bot-username">Bot username</label>
+            <label class="block text-sm font-medium text-gray-700" for="bot-username">Tên bot</label>
             <input
               id="bot-username"
               v-model="form.bot_username"
@@ -41,7 +41,18 @@
               type="password"
               autocomplete="new-password"
               class="mt-1 w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              placeholder="Nhập mã bí mật mới hoặc để trống"
+              :placeholder="settings.webhook_secret_masked || 'Nhập mã bí mật mới hoặc để trống'"
+            />
+            <p class="mt-1 text-xs text-gray-500">Để trống nếu không đổi mã bí mật hiện tại.</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700" for="webhook-url">Đường dẫn webhook</label>
+            <input
+              id="webhook-url"
+              v-model="form.webhook_url"
+              type="url"
+              class="mt-1 w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             />
           </div>
 
@@ -76,6 +87,35 @@
           </button>
         </div>
       </form>
+
+      <section class="rounded-lg bg-white p-6 ring-1 ring-gray-200">
+        <h2 class="text-base font-semibold text-gray-900">Công cụ webhook</h2>
+        <p class="mt-1 text-sm text-gray-600">Đăng ký, kiểm tra hoặc xóa webhook Telegram cho môi trường production.</p>
+        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+            :disabled="webhookForm.processing"
+            @click="registerWebhook"
+          >
+            Đăng ký webhook
+          </button>
+          <button
+            type="button"
+            class="rounded-md border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+            :disabled="webhookForm.processing"
+            @click="deleteWebhook"
+          >
+            Xóa webhook
+          </button>
+          <a href="/telegram/webhook-info" target="_blank" class="rounded-md border border-gray-300 px-4 py-2 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50">
+            Xem trạng thái webhook
+          </a>
+          <a href="/telegram/health" target="_blank" class="rounded-md border border-gray-300 px-4 py-2 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50">
+            Kiểm tra hệ thống
+          </a>
+        </div>
+      </section>
     </div>
   </AppLayout>
 </template>
@@ -95,9 +135,12 @@ const form = useForm({
   bot_token: '',
   bot_username: props.settings.bot_username || '',
   webhook_secret: '',
+  webhook_url: props.settings.webhook_url || 'https://hongbiennhanh.online/telegram/webhook',
   default_chat_id: props.settings.default_chat_id || '',
   enabled: Boolean(props.settings.enabled),
 });
+
+const webhookForm = useForm({});
 
 const submit = () => {
   form.patch('/telegram/settings', {
@@ -105,6 +148,18 @@ const submit = () => {
     onSuccess: () => {
       form.reset('bot_token', 'webhook_secret');
     },
+  });
+};
+
+const registerWebhook = () => {
+  webhookForm.post('/telegram/webhook/register', {
+    preserveScroll: true,
+  });
+};
+
+const deleteWebhook = () => {
+  webhookForm.post('/telegram/webhook/delete', {
+    preserveScroll: true,
   });
 };
 </script>

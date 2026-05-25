@@ -22,6 +22,10 @@
         <dd class="font-medium text-gray-900">{{ settings.webhook_secret_configured ? 'Đã bảo vệ' : 'Chưa có mã bí mật' }}</dd>
       </div>
       <div class="flex justify-between gap-4">
+        <dt class="text-gray-500">Đường dẫn webhook</dt>
+        <dd class="break-all text-right font-medium text-gray-900">{{ settings.webhook_url || 'Chưa cấu hình' }}</dd>
+      </div>
+      <div class="flex justify-between gap-4">
         <dt class="text-gray-500">Mã hội thoại mặc định</dt>
         <dd class="font-medium text-gray-900">{{ settings.default_chat_id || 'Chưa cấu hình' }}</dd>
       </div>

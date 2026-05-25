@@ -187,6 +187,48 @@ Artisan::command('telegram:send-reminders', function (TelegramService $telegramS
     return 0;
 })->purpose('Gửi nhắc lịch Telegram cho checklist hằng ngày');
 
+Artisan::command('telegram:webhook:set', function (TelegramService $telegramService) {
+    $response = $telegramService->setWebhook();
+
+    if (!$response) {
+        $this->error('Chưa cấu hình bot token hoặc webhook URL.');
+
+        return 1;
+    }
+
+    $this->line(json_encode($response->json(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+
+    return $response->successful() ? 0 : 1;
+})->purpose('Đăng ký webhook Telegram production');
+
+Artisan::command('telegram:webhook:info', function (TelegramService $telegramService) {
+    $response = $telegramService->getWebhookInfo();
+
+    if (!$response) {
+        $this->error('Chưa cấu hình bot token.');
+
+        return 1;
+    }
+
+    $this->line(json_encode($response->json(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+
+    return $response->successful() ? 0 : 1;
+})->purpose('Xem trạng thái webhook Telegram');
+
+Artisan::command('telegram:webhook:delete', function (TelegramService $telegramService) {
+    $response = $telegramService->deleteWebhook();
+
+    if (!$response) {
+        $this->error('Chưa cấu hình bot token.');
+
+        return 1;
+    }
+
+    $this->line(json_encode($response->json(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+
+    return $response->successful() ? 0 : 1;
+})->purpose('Xóa webhook Telegram');
+
 Schedule::command('telegram:send-reminders')->everyMinute();
 
 Artisan::command('training:close-missed', function (TrainingService $trainingService) {

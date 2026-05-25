@@ -48,7 +48,7 @@ class TelegramWebhookController extends Controller
         $secret = $telegramService->webhookSecret();
 
         if (blank($secret)) {
-            return true;
+            return app()->environment(['local', 'testing']);
         }
 
         return hash_equals((string) $secret, (string) (

@@ -29,6 +29,7 @@ class TelegramController extends Controller
             'settings' => $this->settingsPayload(),
             'stats' => $this->statsPayload(),
             'trainingTest' => $this->trainingTestPayload(),
+            'systemStatus' => $this->systemStatusPayload(),
         ]);
     }
 
@@ -45,6 +46,7 @@ class TelegramController extends Controller
             'bot_token' => ['nullable', 'string', 'max:500'],
             'bot_username' => ['nullable', 'string', 'max:255'],
             'webhook_secret' => ['nullable', 'string', 'max:255'],
+            'webhook_url' => ['nullable', 'url', 'max:500'],
             'default_chat_id' => ['nullable', 'string', 'max:255'],
             'enabled' => ['boolean'],
         ]);
@@ -52,7 +54,7 @@ class TelegramController extends Controller
         $settings = TelegramSetting::current();
         $settings->fill([
             'bot_username' => $validated['bot_username'] ?? null,
-            'webhook_secret' => $validated['webhook_secret'] ?? null,
+            'webhook_url' => $validated['webhook_url'] ?? null,
             'default_chat_id' => $validated['default_chat_id'] ?? null,
             'enabled' => (bool) ($validated['enabled'] ?? false),
         ]);
@@ -61,9 +63,35 @@ class TelegramController extends Controller
             $settings->bot_token = $validated['bot_token'];
         }
 
+        if (filled($validated['webhook_secret'] ?? null)) {
+            $settings->webhook_secret = $validated['webhook_secret'];
+        }
+
         $settings->save();
 
         return back()->with('success', 'Đã lưu cấu hình Telegram.');
+    }
+
+    public function registerWebhook(TelegramService $telegramService): RedirectResponse
+    {
+        $response = $telegramService->setWebhook();
+
+        if (!$response?->successful()) {
+            return back()->with('error', 'Chưa đăng ký được webhook Telegram. Vui lòng kiểm tra cấu hình bot.');
+        }
+
+        return back()->with('success', 'Đã đăng ký webhook Telegram.');
+    }
+
+    public function deleteWebhook(TelegramService $telegramService): RedirectResponse
+    {
+        $response = $telegramService->deleteWebhook();
+
+        if (!$response?->successful()) {
+            return back()->with('error', 'Chưa xóa được webhook Telegram.');
+        }
+
+        return back()->with('success', 'Đã xóa webhook Telegram.');
     }
 
     public function testSend(Request $request, TelegramService $telegramService): RedirectResponse
@@ -104,6 +132,23 @@ class TelegramController extends Controller
             'ok' => $response->successful(),
             'status' => $response->status(),
             'telegram' => $response->json(),
+        ]);
+    }
+
+    public function health(TelegramService $telegramService): JsonResponse
+    {
+        $info = $telegramService->getWebhookInfo();
+        $lastInbound = TelegramMessage::query()->where('direction', TelegramMessage::DIRECTION_INBOUND)->latest('received_at')->first();
+        $lastOutbound = TelegramMessage::query()->where('direction', TelegramMessage::DIRECTION_OUTBOUND)->latest('sent_at')->first();
+
+        return response()->json([
+            'webhook_configured' => filled($telegramService->webhookUrl()),
+            'bot_reachable' => (bool) $info?->successful(),
+            'queue' => [
+                'connection' => config('queue.default'),
+            ],
+            'last_inbound_at' => optional($lastInbound?->received_at)->toIso8601String(),
+            'last_outbound_at' => optional($lastOutbound?->sent_at)->toIso8601String(),
         ]);
     }
 
@@ -202,6 +247,8 @@ class TelegramController extends Controller
         return [
             'bot_username' => $settings->bot_username ?: config('services.telegram.bot_username'),
             'bot_token_masked' => $settings->maskedToken(),
+            'webhook_secret_masked' => $settings->maskedSecret(),
+            'webhook_url' => $settings->webhook_url ?: config('services.telegram.webhook_url'),
             'default_chat_id' => $settings->default_chat_id,
             'enabled' => $settings->enabled,
             'has_bot_token' => $tokenConfigured,
@@ -220,6 +267,38 @@ class TelegramController extends Controller
             'messages_today' => TelegramMessage::query()->whereDate('created_at', today())->count(),
             'last_inbound_text' => $lastInbound?->message_text,
             'last_inbound_at' => optional($lastInbound?->received_at)->toIso8601String(),
+        ];
+    }
+
+    private function systemStatusPayload(): array
+    {
+        $lastInbound = TelegramMessage::query()
+            ->where('direction', TelegramMessage::DIRECTION_INBOUND)
+            ->latest('received_at')
+            ->first();
+        $lastOutbound = TelegramMessage::query()
+            ->where('direction', TelegramMessage::DIRECTION_OUTBOUND)
+            ->latest('sent_at')
+            ->first();
+
+        $settings = TelegramSetting::current();
+        $info = null;
+        try {
+            $response = app(TelegramService::class)->getWebhookInfo();
+            $info = $response?->json('result');
+        } catch (\Throwable) {
+            $info = null;
+        }
+        $configuredUrl = $settings->webhook_url ?: config('services.telegram.webhook_url');
+
+        return [
+            'webhook_url' => $configuredUrl,
+            'webhook_registered' => filled($info['url'] ?? null) && ($info['url'] ?? null) === $configuredUrl,
+            'pending_updates_count' => $info['pending_update_count'] ?? null,
+            'last_webhook_error' => $info['last_error_message'] ?? null,
+            'bot_reachable' => $info !== null || filled($settings->bot_token) || filled(config('services.telegram.bot_token')),
+            'last_inbound_at' => optional($lastInbound?->received_at)->toIso8601String(),
+            'last_outbound_at' => optional($lastOutbound?->sent_at)->toIso8601String(),
         ];
     }
 

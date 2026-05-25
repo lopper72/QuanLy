@@ -13,6 +13,7 @@ class TelegramSetting extends Model
         'bot_token',
         'bot_username',
         'webhook_secret',
+        'webhook_url',
         'default_chat_id',
         'enabled',
     ];
@@ -31,6 +32,7 @@ class TelegramSetting extends Model
             'bot_token' => config('services.telegram.bot_token'),
             'bot_username' => config('services.telegram.bot_username'),
             'webhook_secret' => config('services.telegram.webhook_secret'),
+            'webhook_url' => config('services.telegram.webhook_url'),
             'enabled' => false,
         ]);
     }
@@ -42,5 +44,14 @@ class TelegramSetting extends Model
         }
 
         return '••••••••' . substr($this->bot_token, -4);
+    }
+
+    public function maskedSecret(): ?string
+    {
+        if (blank($this->webhook_secret)) {
+            return null;
+        }
+
+        return '••••••••' . substr($this->webhook_secret, -4);
     }
 }

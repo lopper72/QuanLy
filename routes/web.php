@@ -141,6 +141,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [TelegramController::class, 'index'])->name('index');
         Route::get('/settings', [TelegramController::class, 'settings'])->name('settings');
         Route::patch('/settings', [TelegramController::class, 'updateSettings'])->name('settings.update');
+        Route::post('/webhook/register', [TelegramController::class, 'registerWebhook'])->name('webhook.register');
+        Route::post('/webhook/delete', [TelegramController::class, 'deleteWebhook'])->name('webhook.delete');
+        Route::get('/health', [TelegramController::class, 'health'])->name('health');
         Route::post('/test-send', [TelegramController::class, 'testSend'])->name('testSend');
         Route::post('/training/send-today', [TelegramController::class, 'sendTodayTraining'])->name('training.sendToday');
         Route::post('/training/simulate-callback', [TelegramController::class, 'simulateTrainingCallback'])->name('training.simulateCallback');
