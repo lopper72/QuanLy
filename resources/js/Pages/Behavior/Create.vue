@@ -20,6 +20,9 @@
 
       <BehaviorForm
         :children="children"
+        :training-sessions="trainingSessions"
+        :selected-training-session="selectedTrainingSession"
+        :selected-training-session-item="selectedTrainingSessionItem"
         :behavior-types="behaviorTypes"
         :severities="severities"
       />
@@ -36,6 +39,18 @@ defineProps({
   children: {
     type: Array,
     required: true,
+  },
+  trainingSessions: {
+    type: Array,
+    default: () => [],
+  },
+  selectedTrainingSession: {
+    type: Object,
+    default: null,
+  },
+  selectedTrainingSessionItem: {
+    type: Object,
+    default: null,
   },
   behaviorTypes: {
     type: Object,

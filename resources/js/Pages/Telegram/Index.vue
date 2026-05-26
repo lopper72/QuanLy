@@ -35,6 +35,35 @@
 
       <section class="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div class="rounded-lg bg-white p-4 ring-1 ring-gray-200">
+          <h2 class="text-base font-semibold text-gray-900">Test lịch ăn uống</h2>
+          <p class="mt-1 text-sm text-gray-500">Kiểm tra gợi ý bữa tối lúc 14:00, lệnh /an, /doimon và nút phản hồi.</p>
+          <select v-model="mealSuggestionForm.child_id" class="mt-4 w-full rounded-md border-gray-300 text-sm shadow-sm">
+            <option value="">Chọn bé</option>
+            <option v-for="child in mealSuggestionTest.children" :key="child.id" :value="child.id">{{ child.full_name }}</option>
+          </select>
+          <div class="mt-3 grid grid-cols-1 gap-2">
+            <button type="button" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700" @click="postMealSuggestion('telegram.test.mealSuggestion.dinner')">
+              Gửi gợi ý bữa tối lúc 14:00
+            </button>
+            <button type="button" class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="postMealSuggestion('telegram.test.mealSuggestion.an')">
+              Giả lập lệnh /an
+            </button>
+            <button type="button" class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="postMealSuggestion('telegram.test.mealSuggestion.doimon')">
+              Giả lập lệnh /doimon
+            </button>
+          </div>
+          <div class="mt-3 grid grid-cols-1 gap-2">
+            <button v-for="action in mealSuggestionActions" :key="action.value" type="button" class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="postMealCallback(action.value)">
+              {{ action.label }}
+            </button>
+          </div>
+          <div class="mt-4 rounded-md bg-gray-50 p-3 text-sm text-gray-600">
+            <p class="font-medium text-gray-900">Tin nhắn xem trước</p>
+            <p class="mt-1 line-clamp-6 whitespace-pre-wrap">{{ mealSuggestionTest.preview.preview_message }}</p>
+          </div>
+        </div>
+
+        <div class="rounded-lg bg-white p-4 ring-1 ring-gray-200">
           <h2 class="text-base font-semibold text-gray-900">Test nhắc lịch</h2>
           <p class="mt-1 text-sm text-gray-500">Gửi thử tin nhắc trước 30 phút cho từng loại lịch.</p>
           <div class="mt-4 space-y-2">
@@ -120,7 +149,7 @@
 
 <script setup>
 import { computed } from 'vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Components/layout/AppLayout.vue';
 import TelegramContactSidebar from '@/Components/telegram/TelegramContactSidebar.vue';
 import TelegramMessageTimeline from '@/Components/telegram/TelegramMessageTimeline.vue';
@@ -139,12 +168,31 @@ const props = defineProps({
   trainingTest: { type: Object, required: true },
   systemStatus: { type: Object, required: true },
   reminderTest: { type: Object, required: true },
+  mealSuggestionTest: { type: Object, required: true },
 });
 
 const latestCallback = computed(() => props.messages.find(message => message.callback_data));
+const mealSuggestionForm = useForm({
+  child_id: props.mealSuggestionTest.children?.[0]?.id || '',
+  action: 'change',
+});
+const mealSuggestionActions = [
+  { value: 'change', label: 'Giả lập bấm Đổi món khác' },
+  { value: 'view', label: 'Giả lập bấm Xem lịch hôm nay' },
+  { value: 'prepared', label: 'Giả lập bấm Đã chuẩn bị' },
+];
 
 function post(routeName) {
   router.post(route(routeName), {}, { preserveScroll: true });
+}
+
+function postMealSuggestion(routeName) {
+  mealSuggestionForm.post(route(routeName), { preserveScroll: true });
+}
+
+function postMealCallback(action) {
+  mealSuggestionForm.action = action;
+  mealSuggestionForm.post(route('telegram.test.mealSuggestion.callback'), { preserveScroll: true });
 }
 
 function reminderTypeLabel(type) {
@@ -161,6 +209,7 @@ function statusLabel(status) {
     sent: 'Đã gửi',
     failed: 'Thất bại',
     skipped: 'Bỏ qua',
+    prepared: 'Đã chuẩn bị',
   }[status] || status;
 }
 

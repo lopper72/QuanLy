@@ -1,35 +1,42 @@
 <template>
   <AppLayout>
     <div class="space-y-6">
-      <!-- Standard Page Header -->
       <PageHeader
         title="Theo dõi hành vi"
-        description="Ghi chép và phân tích các hành vi thách thức và các sự cố tích cực bằng phương pháp theo dõi ABC."
+        description="Ghi chép và phân tích các hành vi cần theo dõi để phụ huynh và chuyên viên có dữ liệu rõ ràng."
       >
         <template #actions>
-          <div class="flex flex-wrap gap-2">
+          <div class="flex flex-wrap items-center gap-2">
             <Link
               v-if="hasActiveChildren"
-              :href="route('behavior.quick')"
-              class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-semibold rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 transition duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              :href="route('behavior.create')"
+              class="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
-              Ghi nhanh hành vi
+              + Ghi nhận hành vi
             </Link>
             <span
               v-else
-              class="inline-flex items-center px-4 py-2 border border-slate-200 text-sm font-semibold rounded-md text-slate-400 bg-slate-50"
+              class="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-400"
             >
-              Ghi nhanh hành vi
+              + Ghi nhận hành vi
             </span>
             <Link
-              :href="route('behavior.create')"
-              class="inline-flex items-center px-4 py-2 border border-slate-200 text-sm font-semibold rounded-md shadow-sm text-slate-700 bg-white hover:bg-slate-50 transition duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              v-if="hasActiveChildren"
+              :href="route('behavior.quick')"
+              class="inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
-              Ghi nhận hành vi
+              Ghi nhanh hành vi
             </Link>
           </div>
         </template>
       </PageHeader>
+
+      <div
+        v-if="!hasActiveChildren"
+        class="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-800"
+      >
+        Chưa có trẻ đang can thiệp để ghi nhận hành vi.
+      </div>
 
       <div v-if="filters.child_status === 'voided'" class="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
         Hồ sơ đã ngừng can thiệp. Chỉ hiển thị dữ liệu lịch sử.
@@ -38,10 +45,8 @@
         Trẻ đang tạm nghỉ. Chỉ nên xem lại dữ liệu, không tạo ghi nhận mới.
       </div>
 
-      <!-- Summary Cards -->
       <BehaviorSummaryCards :summary="summary" :behavior-types="behaviorTypes" />
 
-      <!-- Filters -->
       <BehaviorFilters
         :initial-filters="filters"
         :children="children"
@@ -55,13 +60,13 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
+import { Link } from '@inertiajs/vue3';
 import AppLayout from '../../Components/layout/AppLayout.vue';
 import PageHeader from '../../Components/ui/PageHeader.vue';
 import BehaviorSummaryCards from '../../Components/behavior/BehaviorSummaryCards.vue';
 import BehaviorFilters from '../../Components/behavior/BehaviorFilters.vue';
 import BehaviorTimelineList from '../../Components/behavior/BehaviorTimelineList.vue';
-import { Link } from '@inertiajs/vue3';
-import { computed } from 'vue';
 
 const props = defineProps({
   behaviorLogs: {

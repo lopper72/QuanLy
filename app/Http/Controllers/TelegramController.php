@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\TelegramContact;
 use App\Models\TelegramMessage;
+use App\Models\TelegramMealSuggestionLog;
 use App\Models\TelegramReminderLog;
 use App\Models\TelegramSetting;
 use App\Models\Child;
@@ -11,6 +12,7 @@ use App\Models\MealPlanItem;
 use App\Models\SupplementSchedule;
 use App\Models\TrainingSession;
 use App\Services\TelegramService;
+use App\Services\TelegramMealSuggestionService;
 use App\Services\TelegramReminderService;
 use App\Services\TelegramTrainingNotificationService;
 use Illuminate\Http\JsonResponse;
@@ -35,6 +37,7 @@ class TelegramController extends Controller
             'trainingTest' => $this->trainingTestPayload(),
             'systemStatus' => $this->systemStatusPayload(),
             'reminderTest' => $this->reminderTestPayload(),
+            'mealSuggestionTest' => $this->mealSuggestionTestPayload(),
         ]);
     }
 
@@ -192,6 +195,86 @@ class TelegramController extends Controller
         return $this->simulateTrainingCallback($request, $trainingService);
     }
 
+    public function testDinnerSuggestion(Request $request, TelegramMealSuggestionService $service): RedirectResponse
+    {
+        $child = $this->validatedMealSuggestionChild($request);
+        $log = $service->sendDinnerSuggestionForChild($child, today());
+
+        if (!$log) {
+            return back()->with('error', 'Chưa có mã hội thoại Telegram cho phụ huynh.');
+        }
+
+        return back()->with('success', 'Đã gửi thử gợi ý bữa tối lúc 14:00.');
+    }
+
+    public function testMealCommandAn(Request $request, TelegramMealSuggestionService $service): RedirectResponse
+    {
+        $child = $this->validatedMealSuggestionChild($request);
+        $chatId = $service->resolveChatId($child);
+        if (blank($chatId)) {
+            return back()->with('error', 'Chưa có mã hội thoại Telegram cho phụ huynh.');
+        }
+
+        TelegramMessage::create([
+            'direction' => TelegramMessage::DIRECTION_INBOUND,
+            'telegram_chat_id' => $chatId,
+            'message_type' => 'text',
+            'message_text' => '/an',
+            'payload_json' => ['source' => 'telegram_test_center'],
+            'delivery_status' => TelegramMessage::STATUS_RECEIVED,
+            'received_at' => now(),
+            'related_child_id' => $child->id,
+        ]);
+        $service->sendTodayMealScheduleForChat($chatId, $child, today());
+
+        return back()->with('success', 'Đã giả lập lệnh /an.');
+    }
+
+    public function testMealCommandDoimon(Request $request, TelegramMealSuggestionService $service): RedirectResponse
+    {
+        $child = $this->validatedMealSuggestionChild($request);
+        $chatId = $service->resolveChatId($child);
+        if (blank($chatId)) {
+            return back()->with('error', 'Chưa có mã hội thoại Telegram cho phụ huynh.');
+        }
+
+        TelegramMessage::create([
+            'direction' => TelegramMessage::DIRECTION_INBOUND,
+            'telegram_chat_id' => $chatId,
+            'message_type' => 'text',
+            'message_text' => '/doimon',
+            'payload_json' => ['source' => 'telegram_test_center'],
+            'delivery_status' => TelegramMessage::STATUS_RECEIVED,
+            'received_at' => now(),
+            'related_child_id' => $child->id,
+        ]);
+        $service->sendAlternativeDinnerForChat($chatId, $child, today());
+
+        return back()->with('success', 'Đã giả lập lệnh /doimon.');
+    }
+
+    public function testMealSuggestionCallback(Request $request, TelegramMealSuggestionService $service): RedirectResponse
+    {
+        $validated = $request->validate([
+            'child_id' => ['required', 'integer', 'exists:children,id'],
+            'action' => ['required', 'string', 'in:change,view,prepared'],
+        ]);
+        $child = Child::active()->findOrFail($validated['child_id']);
+        $chatId = $service->resolveChatId($child) ?: 'test-chat';
+
+        $service->handleCallback([
+            'id' => 'simulate-meal-'.now()->timestamp,
+            'data' => "meal_suggestion:{$child->id}:".today()->toDateString().":{$validated['action']}",
+            'from' => ['id' => 'simulate-user', 'first_name' => 'Phụ huynh'],
+            'message' => [
+                'date' => now()->timestamp,
+                'chat' => ['id' => $chatId, 'first_name' => 'Phụ huynh'],
+            ],
+        ]);
+
+        return back()->with('success', 'Đã giả lập phản hồi gợi ý bữa tối.');
+    }
+
     private function sendTestReminder(TelegramReminderService $service, string $type): RedirectResponse
     {
         try {
@@ -202,6 +285,15 @@ class TelegramController extends Controller
         }
 
         return back()->with('success', 'Đã gửi thử nhắc lịch Telegram.');
+    }
+
+    private function validatedMealSuggestionChild(Request $request): Child
+    {
+        $validated = $request->validate([
+            'child_id' => ['required', 'integer', 'exists:children,id'],
+        ]);
+
+        return Child::active()->findOrFail($validated['child_id']);
     }
 
     public function health(TelegramService $telegramService): JsonResponse
@@ -417,6 +509,42 @@ class TelegramController extends Controller
                     'status' => $log->status,
                     'error_message' => $log->error_message,
                 ]),
+        ];
+    }
+
+    private function mealSuggestionTestPayload(): array
+    {
+        $children = Child::active()
+            ->orderBy('full_name')
+            ->get(['id', 'full_name', 'status'])
+            ->map(fn (Child $child) => [
+                'id' => $child->id,
+                'full_name' => $child->full_name,
+                'status' => $child->status,
+            ]);
+
+        $previewChild = Child::active()->orderBy('full_name')->first();
+        $service = app(TelegramMealSuggestionService::class);
+
+        return [
+            'children' => $children,
+            'preview' => $service->previewPayload($previewChild),
+            'logs' => TelegramMealSuggestionLog::with('child:id,full_name')
+                ->latest()
+                ->limit(10)
+                ->get()
+                ->map(fn (TelegramMealSuggestionLog $log) => [
+                    'id' => $log->id,
+                    'child_name' => $log->child?->full_name,
+                    'suggestion_date' => optional($log->suggestion_date)->toDateString(),
+                    'sent_at' => optional($log->sent_at)->toIso8601String(),
+                    'status' => $log->status,
+                    'error_message' => $log->error_message,
+                ]),
+            'last_callback' => TelegramMessage::query()
+                ->where('message_type', 'meal_suggestion_callback')
+                ->latest()
+                ->first()?->only(['message_text', 'callback_data', 'action_status']),
         ];
     }
 

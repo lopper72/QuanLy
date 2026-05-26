@@ -31,18 +31,13 @@ class BehaviorService
      */
     public function listBehaviorLogs(array $filters = [])
     {
-        $query = BehaviorLog::with('child')->orderBy('recorded_at', 'desc');
-        $childStatus = $filters['child_status'] ?? Child::STATUS_ACTIVE;
-
-        if ($childStatus === Child::STATUS_ACTIVE) {
-            $query->whereHas('child', fn ($childQuery) => $childQuery->active());
-        } elseif ($childStatus === Child::STATUS_PAUSED) {
-            $query->whereHas('child', fn ($childQuery) => $childQuery->paused());
-        } elseif ($childStatus === Child::STATUS_VOIDED) {
-            $query->whereHas('child', fn ($childQuery) => $childQuery->voided());
-        } elseif ($childStatus !== 'all') {
-            $query->whereHas('child', fn ($childQuery) => $childQuery->active());
-        }
+        $query = BehaviorLog::with([
+            'child',
+            'trainingSession',
+            'trainingSessionItem.exercise',
+        ])
+            ->whereHas('child', fn ($childQuery) => $childQuery->activeForWorkflow())
+            ->orderBy('recorded_at', 'desc');
 
         if (!empty($filters['child_id'])) {
             $query->where('child_id', $filters['child_id']);
@@ -92,23 +87,12 @@ class BehaviorService
 
     public function getFilterChildren(?string $childStatus = null)
     {
-        $query = Child::query();
-        $status = $childStatus ?? Child::STATUS_ACTIVE;
-
-        if ($status === Child::STATUS_ACTIVE) {
-            $query->active();
-        } elseif ($status === Child::STATUS_PAUSED) {
-            $query->paused();
-        } elseif ($status === Child::STATUS_VOIDED) {
-            $query->voided();
-        }
-
-        return $query->orderBy('full_name')->get(['id', 'full_name', 'status']);
+        return Child::activeForWorkflow()->orderBy('full_name')->get(['id', 'full_name', 'status']);
     }
 
     public function getActiveChildren()
     {
-        return Child::active()->orderBy('full_name')->get(['id', 'full_name', 'status']);
+        return Child::activeForWorkflow()->orderBy('full_name')->get(['id', 'full_name', 'status']);
     }
 
     /**
@@ -124,7 +108,7 @@ class BehaviorService
      */
     public function getBehaviorLogDetail(BehaviorLog $behaviorLog): BehaviorLog
     {
-        return $behaviorLog->load('child');
+        return $behaviorLog->load(['child', 'trainingSession', 'trainingSessionItem.exercise']);
     }
 
     /**

@@ -29,11 +29,7 @@ class ReportController extends Controller
         $filters = $request->only(['child_id', 'report_type', 'start_date', 'end_date']);
         $reports = $this->reportService->listReports($filters);
         
-        $query = Child::notVoided();
-        if ($request->filled('child_id')) {
-            $query->orWhere('id', $request->input('child_id'));
-        }
-        $children = $query->orderBy('full_name')->get();
+        $children = Child::activeForWorkflow()->orderBy('full_name')->get();
 
         return Inertia::render('Reports/Index', [
             'reports' => $reports,
@@ -53,7 +49,7 @@ class ReportController extends Controller
      */
     public function create(): Response
     {
-        $children = Child::active()->orderBy('full_name')->get();
+        $children = Child::activeForWorkflow()->orderBy('full_name')->get();
 
         return Inertia::render('Reports/Create', [
             'children' => $children,
@@ -96,8 +92,7 @@ class ReportController extends Controller
      */
     public function edit(Report $report): Response
     {
-        $children = Child::notVoided()
-            ->orWhere('id', $report->child_id)
+        $children = Child::activeForWorkflow()
             ->orderBy('full_name')
             ->get();
 

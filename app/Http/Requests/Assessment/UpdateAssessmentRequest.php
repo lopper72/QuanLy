@@ -17,7 +17,9 @@ class UpdateAssessmentRequest extends FormRequest
         return [
             'child_id' => [
                 'required',
-                Rule::exists('children', 'id')->where(fn ($query) => $query->where('status', 'active')),
+                Rule::exists('children', 'id')->where(fn ($query) => $query
+                    ->where('status', 'active')
+                    ->whereNull('deleted_at')),
             ],
             'assessment_date' => ['required', 'date'],
             'overall_score' => ['nullable', 'integer', 'min:0', 'max:100'],

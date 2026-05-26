@@ -12,6 +12,18 @@
       class="space-y-6 rounded-lg border border-slate-100 bg-white p-6 shadow-sm"
       @submit.prevent="submit"
     >
+      <div
+        v-if="hasTrainingContext"
+        class="rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-800"
+      >
+        <p class="font-semibold">Đang ghi nhận hành vi trong buổi tập.</p>
+        <p class="mt-1">
+          Buổi tập ngày {{ formatSessionDate(selectedSession?.session_date) }}
+          <span v-if="selectedSession?.scheduled_time"> lúc {{ formatTime(selectedSession.scheduled_time) }}</span>
+          <span v-if="selectedItemTitle">, bài tập: {{ selectedItemTitle }}</span>.
+        </p>
+      </div>
+
       <section class="space-y-3">
         <div>
           <h2 class="text-base font-semibold text-slate-900">Chọn nhanh loại hành vi</h2>
@@ -41,6 +53,7 @@
           <select
             id="child_id"
             v-model="form.child_id"
+            :disabled="hasTrainingContext"
             class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             :class="{ 'border-rose-300 focus:border-rose-500 focus:ring-rose-500': form.errors.child_id }"
             required
@@ -104,6 +117,52 @@
         </div>
 
         <div class="md:col-span-2">
+          <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+            <input
+              v-model="linkToTraining"
+              type="checkbox"
+              class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            Xảy ra trong buổi tập?
+          </label>
+        </div>
+
+        <template v-if="linkToTraining">
+          <div>
+            <label for="training_session_id" class="block text-sm font-medium text-slate-700">Buổi tập liên quan</label>
+            <select
+              id="training_session_id"
+              v-model="form.training_session_id"
+              class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              :class="{ 'border-rose-300 focus:border-rose-500 focus:ring-rose-500': form.errors.training_session_id }"
+              @change="syncChildFromTrainingSession"
+            >
+              <option value="">Chọn buổi tập</option>
+              <option v-for="session in trainingSessions" :key="session.id" :value="session.id">
+                {{ trainingSessionLabel(session) }}
+              </option>
+            </select>
+            <p v-if="form.errors.training_session_id" class="mt-1 text-sm text-rose-600">{{ form.errors.training_session_id }}</p>
+          </div>
+
+          <div>
+            <label for="training_session_item_id" class="block text-sm font-medium text-slate-700">Bài tập liên quan</label>
+            <select
+              id="training_session_item_id"
+              v-model="form.training_session_item_id"
+              class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              :class="{ 'border-rose-300 focus:border-rose-500 focus:ring-rose-500': form.errors.training_session_item_id }"
+            >
+              <option value="">Chọn bài tập nếu có</option>
+              <option v-for="item in relatedItems" :key="item.id" :value="item.id">
+                {{ item.exercise?.title || 'Bài tập chưa xác định' }}
+              </option>
+            </select>
+            <p v-if="form.errors.training_session_item_id" class="mt-1 text-sm text-rose-600">{{ form.errors.training_session_item_id }}</p>
+          </div>
+        </template>
+
+        <div class="md:col-span-2">
           <label for="trigger" class="block text-sm font-medium text-slate-700">Nguyên nhân/kích hoạt</label>
           <textarea
             id="trigger"
@@ -163,7 +222,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -174,6 +233,18 @@ const props = defineProps({
   children: {
     type: Array,
     required: true,
+  },
+  trainingSessions: {
+    type: Array,
+    default: () => [],
+  },
+  selectedTrainingSession: {
+    type: Object,
+    default: null,
+  },
+  selectedTrainingSessionItem: {
+    type: Object,
+    default: null,
   },
   behaviorTypes: {
     type: Object,
@@ -196,6 +267,9 @@ const quickPresets = [
 ];
 
 const isEdit = computed(() => !!props.behaviorLog);
+const hasTrainingContext = computed(() => !!props.selectedTrainingSession);
+const selectedSession = computed(() => props.selectedTrainingSession);
+const selectedItemTitle = computed(() => props.selectedTrainingSessionItem?.exercise?.title || '');
 
 const formatDateForInput = (dateString) => {
   if (!dateString) {
@@ -211,7 +285,9 @@ const formatDateForInput = (dateString) => {
 };
 
 const form = useForm({
-  child_id: props.behaviorLog?.child_id ?? '',
+  child_id: props.behaviorLog?.child_id ?? props.selectedTrainingSession?.child_id ?? '',
+  training_session_id: props.behaviorLog?.training_session_id ?? props.selectedTrainingSession?.id ?? '',
+  training_session_item_id: props.behaviorLog?.training_session_item_id ?? props.selectedTrainingSessionItem?.id ?? '',
   behavior_type: props.behaviorLog?.behavior_type ?? '',
   severity: props.behaviorLog?.severity ?? '',
   recorded_at: formatDateForInput(props.behaviorLog?.recorded_at),
@@ -219,6 +295,29 @@ const form = useForm({
   response: props.behaviorLog?.response ?? '',
   note: props.behaviorLog?.note ?? '',
 });
+
+const linkToTraining = ref(!!form.training_session_id);
+
+const relatedItems = computed(() => {
+  const session = props.trainingSessions.find((item) => String(item.id) === String(form.training_session_id));
+  return session?.items || [];
+});
+
+watch(linkToTraining, (enabled) => {
+  if (!enabled) {
+    form.training_session_id = '';
+    form.training_session_item_id = '';
+  }
+});
+
+watch(
+  () => form.training_session_id,
+  () => {
+    if (!relatedItems.value.some((item) => String(item.id) === String(form.training_session_item_id))) {
+      form.training_session_item_id = '';
+    }
+  }
+);
 
 const cancelUrl = computed(() => {
   return isEdit.value ? route('behavior.show', props.behaviorLog.id) : route('behavior.index');
@@ -237,4 +336,29 @@ const submit = () => {
     onSuccess: () => emit('submit', form),
   });
 };
+
+function syncChildFromTrainingSession() {
+  const session = props.trainingSessions.find((item) => String(item.id) === String(form.training_session_id));
+  if (session?.child_id) {
+    form.child_id = session.child_id;
+  }
+}
+
+function formatSessionDate(dateString) {
+  if (!dateString) return 'chưa xác định';
+  return new Date(dateString).toLocaleDateString('vi-VN');
+}
+
+function formatTime(timeString) {
+  if (!timeString) return '';
+  return String(timeString).slice(0, 5);
+}
+
+function trainingSessionLabel(session) {
+  const childName = session.child?.full_name || 'Trẻ chưa xác định';
+  const date = formatSessionDate(session.session_date);
+  const time = session.scheduled_time ? ` ${formatTime(session.scheduled_time)}` : '';
+
+  return `${childName} - ${date}${time}`;
+}
 </script>

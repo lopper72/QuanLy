@@ -15,12 +15,13 @@ class ReportService
      */
     public function listReports(array $filters = [])
     {
-        $query = Report::with('child')->orderBy('report_date', 'desc')->orderBy('id', 'desc');
+        $query = Report::with('child')
+            ->whereHas('child', fn ($childQuery) => $childQuery->activeForWorkflow())
+            ->orderBy('report_date', 'desc')
+            ->orderBy('id', 'desc');
 
         if (!empty($filters['child_id'])) {
             $query->where('child_id', $filters['child_id']);
-        } else {
-            $query->whereHas('child', fn ($q) => $q->notVoided());
         }
 
         if (!empty($filters['report_type'])) {

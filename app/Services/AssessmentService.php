@@ -4,13 +4,16 @@ namespace App\Services;
 
 use App\Models\Assessment;
 use App\Models\AssessmentItem;
+use App\Models\Child;
 use Illuminate\Support\Facades\DB;
 
 class AssessmentService
 {
     public function listAssessments(array $filters = [])
     {
-        $query = Assessment::with('child')->orderBy('assessment_date', 'desc');
+        $query = Assessment::with('child')
+            ->whereHas('child', fn ($childQuery) => $childQuery->activeForWorkflow())
+            ->orderBy('assessment_date', 'desc');
 
         if (!empty($filters['child_id'])) {
             $query->where('child_id', $filters['child_id']);
@@ -111,7 +114,8 @@ class AssessmentService
 
     public function getAssessmentSummary(array $filters = []): array
     {
-        $query = Assessment::query();
+        $query = Assessment::query()
+            ->whereHas('child', fn ($childQuery) => $childQuery->activeForWorkflow());
 
         if (!empty($filters['child_id'])) {
             $query->where('child_id', $filters['child_id']);
@@ -121,7 +125,8 @@ class AssessmentService
         $avgScore = $query->avg('overall_score');
 
         // Let's get counts of items by level
-        $itemQuery = AssessmentItem::query();
+        $itemQuery = AssessmentItem::query()
+            ->whereHas('assessment.child', fn ($childQuery) => $childQuery->activeForWorkflow());
         if (!empty($filters['child_id'])) {
             $itemQuery->whereHas('assessment', function ($q) use ($filters) {
                 $q->where('child_id', $filters['child_id']);
@@ -151,6 +156,13 @@ class AssessmentService
         $query = AssessmentItem::with('assessment.child')
             ->join('assessments', 'assessment_items.assessment_id', '=', 'assessments.id')
             ->select('assessment_items.*', 'assessments.assessment_date')
+            ->whereExists(function ($childQuery) {
+                $childQuery->select(DB::raw(1))
+                    ->from('children')
+                    ->whereColumn('children.id', 'assessments.child_id')
+                    ->where('children.status', Child::STATUS_ACTIVE)
+                    ->whereNull('children.deleted_at');
+            })
             ->orderBy('assessments.assessment_date', 'asc');
 
         if (!empty($filters['child_id'])) {
@@ -186,6 +198,13 @@ class AssessmentService
         foreach ($skills as $skill) {
             $query = AssessmentItem::where('skill_name', $skill)
                 ->join('assessments', 'assessment_items.assessment_id', '=', 'assessments.id')
+                ->whereExists(function ($childQuery) {
+                    $childQuery->select(DB::raw(1))
+                        ->from('children')
+                        ->whereColumn('children.id', 'assessments.child_id')
+                        ->where('children.status', Child::STATUS_ACTIVE)
+                        ->whereNull('children.deleted_at');
+                })
                 ->orderBy('assessments.assessment_date', 'desc');
 
             if ($childId) {
@@ -221,6 +240,13 @@ class AssessmentService
     {
         $query = AssessmentItem::where('skill_name', $skillName)
             ->join('assessments', 'assessment_items.assessment_id', '=', 'assessments.id')
+            ->whereExists(function ($childQuery) {
+                $childQuery->select(DB::raw(1))
+                    ->from('children')
+                    ->whereColumn('children.id', 'assessments.child_id')
+                    ->where('children.status', Child::STATUS_ACTIVE)
+                    ->whereNull('children.deleted_at');
+            })
             ->orderBy('assessments.assessment_date', 'desc')
             ->limit(2);
 

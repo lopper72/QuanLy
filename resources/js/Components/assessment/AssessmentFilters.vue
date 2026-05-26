@@ -24,7 +24,7 @@
           @change="submit"
         >
           <option value="">Tất cả trẻ</option>
-          <option v-for="child in children" :key="child.id" :value="child.id">
+          <option v-for="child in safeChildren" :key="child.id" :value="child.id">
             {{ child.full_name }}
           </option>
         </select>
@@ -77,6 +77,9 @@ const props = defineProps({
 });
 
 const isArray = Array.isArray(props.filters);
+const safeChildren = computed(() => (props.children || []).filter((child) => {
+  return child && child.status === 'active' && !child.deleted_at;
+}));
 const form = ref({
   search: (!isArray && props.filters?.search) || '',
   child_id: (!isArray && props.filters?.child_id) || '',

@@ -71,6 +71,29 @@ class AssessmentControllerTest extends TestCase
         );
     }
 
+    public function test_assessment_excludes_voided_and_deleted_children(): void
+    {
+        $activeChild = Child::factory()->create(['status' => 'active']);
+        $voidedChild = Child::factory()->create(['status' => 'voided']);
+        $deletedChild = Child::factory()->create(['status' => 'active']);
+
+        Assessment::factory()->create(['child_id' => $activeChild->id]);
+        Assessment::factory()->create(['child_id' => $voidedChild->id]);
+        Assessment::factory()->create(['child_id' => $deletedChild->id]);
+        $deletedChild->delete();
+
+        $response = $this->get('/assessment');
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Assessment/Index')
+            ->has('assessments.data', 1)
+            ->where('assessments.data.0.child.id', $activeChild->id)
+            ->has('children', 1)
+            ->where('children.0.id', $activeChild->id)
+        );
+    }
+
     public function test_assessment_progress_page_loads_with_empty_filters(): void
     {
         $response = $this->get('/assessment/progress?child_id=&skill_name=');
@@ -107,6 +130,8 @@ class AssessmentControllerTest extends TestCase
         $activeChild = Child::factory()->create(['status' => 'active']);
         Child::factory()->create(['status' => 'paused']);
         Child::factory()->create(['status' => 'voided']);
+        $deletedChild = Child::factory()->create(['status' => 'active']);
+        $deletedChild->delete();
 
         $response = $this->get('/assessment/create');
 
@@ -122,8 +147,10 @@ class AssessmentControllerTest extends TestCase
     {
         $pausedChild = Child::factory()->create(['status' => 'paused']);
         $voidedChild = Child::factory()->create(['status' => 'voided']);
+        $deletedChild = Child::factory()->create(['status' => 'active']);
+        $deletedChild->delete();
 
-        foreach ([$pausedChild, $voidedChild] as $child) {
+        foreach ([$pausedChild, $voidedChild, $deletedChild] as $child) {
             $response = $this->post('/assessment', [
                 'child_id' => $child->id,
                 'assessment_date' => '2026-05-20',

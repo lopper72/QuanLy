@@ -97,6 +97,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [MealPlanController::class, 'index'])->name('index');
         Route::post('/apply', [MealPlanController::class, 'apply'])->name('apply');
         Route::post('/logs', [MealPlanController::class, 'log'])->name('logs.store');
+        Route::post('/telegram/dinner-suggestion', [MealPlanController::class, 'sendDinnerSuggestion'])->name('telegram.dinnerSuggestion');
+        Route::post('/telegram/alternative-dinner', [MealPlanController::class, 'sendAlternativeDinner'])->name('telegram.alternativeDinner');
+        Route::post('/telegram/today-schedule', [MealPlanController::class, 'sendTodayMealSchedule'])->name('telegram.todaySchedule');
     });
 
     // Exercise Library Routes
@@ -172,6 +175,10 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/test/reminder/training', [TelegramController::class, 'testReminderTraining'])->name('test.reminder.training');
         Route::post('/test/reminder/meal', [TelegramController::class, 'testReminderMeal'])->name('test.reminder.meal');
         Route::post('/test/reminder/supplement', [TelegramController::class, 'testReminderSupplement'])->name('test.reminder.supplement');
+        Route::post('/test/meal-suggestion/dinner', [TelegramController::class, 'testDinnerSuggestion'])->name('test.mealSuggestion.dinner');
+        Route::post('/test/meal-suggestion/an', [TelegramController::class, 'testMealCommandAn'])->name('test.mealSuggestion.an');
+        Route::post('/test/meal-suggestion/doimon', [TelegramController::class, 'testMealCommandDoimon'])->name('test.mealSuggestion.doimon');
+        Route::post('/test/meal-suggestion/callback', [TelegramController::class, 'testMealSuggestionCallback'])->name('test.mealSuggestion.callback');
         Route::post('/test/callback/simulate', [TelegramController::class, 'simulateCallback'])->name('test.callback.simulate');
         Route::get('/webhook-info', [TelegramController::class, 'webhookInfo'])->name('webhookInfo');
         Route::get('/messages', [TelegramController::class, 'messages'])->name('messages');

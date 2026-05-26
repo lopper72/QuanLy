@@ -5,6 +5,8 @@ use App\Models\DailyChecklist;
 use App\Models\Exercise;
 use App\Models\Reminder;
 use App\Models\User;
+use App\Services\TelegramCommandService;
+use App\Services\TelegramMealSuggestionService;
 use App\Services\TelegramService;
 use App\Services\TelegramReminderService;
 use App\Services\TrainingService;
@@ -230,6 +232,20 @@ Artisan::command('telegram:webhook:delete', function (TelegramService $telegramS
     return $response->successful() ? 0 : 1;
 })->purpose('Xóa webhook Telegram');
 
+Artisan::command('telegram:commands:set', function (TelegramService $telegramService, TelegramCommandService $commandService) {
+    $response = $telegramService->setMyCommands($commandService->commands());
+
+    if (!$response) {
+        $this->error('Chưa cấu hình bot token.');
+
+        return 1;
+    }
+
+    $this->line(json_encode($response->json(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+
+    return $response->successful() ? 0 : 1;
+})->purpose('Đăng ký danh sách lệnh Telegram cho phụ huynh');
+
 Schedule::command('telegram:send-reminders')->everyMinute();
 
 Artisan::command('telegram:send-due-reminders', function (TelegramReminderService $reminderService) {
@@ -244,6 +260,19 @@ Artisan::command('telegram:send-due-reminders', function (TelegramReminderServic
 })->purpose('Gửi các nhắc lịch Telegram đến hạn trước 30 phút');
 
 Schedule::command('telegram:send-due-reminders')->everyMinute();
+
+Artisan::command('telegram:send-dinner-suggestions', function (TelegramMealSuggestionService $mealSuggestionService) {
+    $result = $mealSuggestionService->sendDailyDinnerSuggestions();
+
+    $this->info("Đã kiểm tra {$result['children']} trẻ đang can thiệp.");
+    $this->line("Đã gửi: {$result['sent']}");
+    $this->line("Bỏ qua: {$result['skipped']}");
+    $this->line("Thất bại: {$result['failed']}");
+
+    return $result['failed'] > 0 ? 1 : 0;
+})->purpose('Gửi gợi ý bữa tối qua Telegram lúc 14:00');
+
+Schedule::command('telegram:send-dinner-suggestions')->dailyAt('14:00');
 
 Artisan::command('training:close-missed', function (TrainingService $trainingService) {
     $count = $trainingService->closeMissedSessions();

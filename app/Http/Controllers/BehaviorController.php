@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\BehaviorLog;
 use App\Models\Child;
+use App\Models\TrainingSession;
+use App\Models\TrainingSessionItem;
 use App\Http\Requests\Behavior\StoreBehaviorRequest;
 use App\Http\Requests\Behavior\UpdateBehaviorRequest;
 use App\Services\BehaviorService;
@@ -109,7 +111,9 @@ class BehaviorController extends Controller
         $validated = $request->validate([
             'child_id' => [
                 'required',
-                Rule::exists('children', 'id')->where(fn ($query) => $query->where('status', 'active')),
+                Rule::exists('children', 'id')->where(fn ($query) => $query
+                    ->where('status', 'active')
+                    ->whereNull('deleted_at')),
             ],
             'behavior_type' => [
                 'required',
@@ -158,13 +162,12 @@ class BehaviorController extends Controller
      */
     public function index(Request $request): Response
     {
-        $filters = $request->only(['child_id', 'child_status', 'behavior_type', 'severity', 'date_from', 'date_to', 'start_date', 'end_date']);
-        $filters['child_status'] = $filters['child_status'] ?? Child::STATUS_ACTIVE;
+        $filters = $request->only(['child_id', 'behavior_type', 'severity', 'date_from', 'date_to', 'start_date', 'end_date']);
         
         $behaviorLogs = $this->behaviorService->listBehaviorLogs($filters);
         $behaviorGroups = $this->behaviorService->groupLogsByChild($behaviorLogs);
         $summary = $this->behaviorService->getBehaviorSummary($filters);
-        $children = $this->behaviorService->getFilterChildren($filters['child_status']);
+        $children = $this->behaviorService->getFilterChildren();
         $activeChildren = $this->behaviorService->getActiveChildren();
 
         return Inertia::render('Behavior/Index', [
@@ -175,7 +178,7 @@ class BehaviorController extends Controller
             'activeChildren' => $activeChildren,
             'filters' => [
                 'child_id' => $filters['child_id'] ?? '',
-                'child_status' => $filters['child_status'],
+                'child_status' => Child::STATUS_ACTIVE,
                 'behavior_type' => $filters['behavior_type'] ?? '',
                 'severity' => $filters['severity'] ?? '',
                 'date_from' => $filters['date_from'] ?? $filters['start_date'] ?? '',
@@ -193,12 +196,34 @@ class BehaviorController extends Controller
     /**
      * Show the form for creating a new behavior log.
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
         $children = $this->behaviorService->getActiveChildren();
+        $trainingSessions = TrainingSession::with(['child:id,full_name,status', 'items.exercise:id,title,category'])
+            ->whereHas('child', fn ($query) => $query->active())
+            ->orderByDesc('session_date')
+            ->orderByDesc('scheduled_time')
+            ->limit(100)
+            ->get();
+
+        $selectedTrainingSession = null;
+        $selectedTrainingSessionItem = null;
+
+        if ($request->filled('training_session_id')) {
+            $selectedTrainingSession = TrainingSession::with(['child:id,full_name,status', 'items.exercise:id,title,category'])
+                ->find($request->integer('training_session_id'));
+        }
+
+        if ($request->filled('training_session_item_id')) {
+            $selectedTrainingSessionItem = TrainingSessionItem::with('exercise:id,title,category')
+                ->find($request->integer('training_session_item_id'));
+        }
 
         return Inertia::render('Behavior/Create', [
             'children' => $children,
+            'trainingSessions' => $trainingSessions,
+            'selectedTrainingSession' => $selectedTrainingSession,
+            'selectedTrainingSessionItem' => $selectedTrainingSessionItem,
             'behaviorTypes' => BehaviorService::BEHAVIOR_TYPES,
             'severities' => BehaviorService::SEVERITIES,
         ]);

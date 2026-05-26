@@ -27,11 +27,9 @@ class AssessmentController extends Controller
         $assessments = $this->assessmentService->listAssessments($filters);
         $summary = $this->assessmentService->getAssessmentSummary($filters);
         
-        $query = Child::notVoided();
-        if (!empty($filters['child_id'])) {
-            $query->orWhere('id', $filters['child_id']);
-        }
-        $children = $query->orderBy('full_name')->get(['id', 'full_name', 'status']);
+        $children = Child::activeForWorkflow()
+            ->orderBy('full_name')
+            ->get(['id', 'full_name', 'status']);
 
         return Inertia::render('Assessment/Index', [
             'assessments' => $assessments,
@@ -52,11 +50,9 @@ class AssessmentController extends Controller
             $filters['child_id'] ?? null
         );
         
-        $query = Child::notVoided();
-        if (!empty($filters['child_id'])) {
-            $query->orWhere('id', $filters['child_id']);
-        }
-        $children = $query->orderBy('full_name')->get(['id', 'full_name', 'status']);
+        $children = Child::activeForWorkflow()
+            ->orderBy('full_name')
+            ->get(['id', 'full_name', 'status']);
 
         return Inertia::render('Assessment/Progress', [
             'progressData' => $progressData,
@@ -70,7 +66,7 @@ class AssessmentController extends Controller
 
     public function create(): Response
     {
-        $children = Child::active()->orderBy('full_name')->get(['id', 'full_name', 'status']);
+        $children = Child::activeForWorkflow()->orderBy('full_name')->get(['id', 'full_name', 'status']);
 
         // Default empty items with the 10 core skill names pre-filled
         $defaultItems = collect($this->getSkillTypes())->map(function ($label, $key) {
@@ -112,8 +108,7 @@ class AssessmentController extends Controller
     public function edit(Assessment $assessment): Response
     {
         $detail = $this->assessmentService->getAssessmentDetail($assessment);
-        $children = Child::active()
-            ->orWhere('id', $assessment->child_id)
+        $children = Child::activeForWorkflow()
             ->orderBy('full_name')
             ->get(['id', 'full_name', 'status']);
 

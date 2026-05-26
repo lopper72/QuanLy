@@ -583,6 +583,31 @@ class TrainingControllerTest extends TestCase
         );
     }
 
+    public function test_training_show_has_behavior_logging_entry_point(): void
+    {
+        $child = Child::factory()->create();
+        $session = TrainingSession::factory()->create(['child_id' => $child->id]);
+        $exercise = Exercise::factory()->create();
+        $item = TrainingSessionItem::factory()->create([
+            'training_session_id' => $session->id,
+            'exercise_id' => $exercise->id,
+        ]);
+
+        $response = $this->get("/training/{$session->id}");
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Training/Show')
+            ->where('session.id', $session->id)
+            ->where('session.items.0.id', $item->id)
+        );
+
+        $this->assertStringContainsString(
+            'Ghi nhận hành vi trong buổi tập',
+            file_get_contents(resource_path('js/Pages/Training/Show.vue'))
+        );
+    }
+
     /**
      * Test rendering edit daily training session page.
      */

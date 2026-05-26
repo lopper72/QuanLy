@@ -1,7 +1,7 @@
 <template>
   <div>
     <EmptyState
-      v-if="!assessments.data || assessments.data.length === 0"
+      v-if="safeAssessments.data.length === 0"
       title="Chưa có dữ liệu đánh giá"
       description="Thực hiện đánh giá các mốc phát triển hoặc hành vi cho trẻ."
     >
@@ -33,7 +33,7 @@
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="assessment in assessments.data" :key="assessment.id" class="hover:bg-gray-50 transition duration-150">
+            <tr v-for="assessment in safeAssessments.data" :key="assessment.id" class="hover:bg-gray-50 transition duration-150">
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="text-sm font-medium text-gray-900">
                   {{ childName(assessment.child) }}
@@ -165,6 +165,13 @@ const props = defineProps({
 });
 
 const availableLinks = computed(() => (props.assessments.links || []).filter((link) => link.url));
+
+const safeAssessments = computed(() => ({
+  ...props.assessments,
+  data: (props.assessments.data || []).filter((assessment) => {
+    return assessment.child && assessment.child.status === 'active' && !assessment.child.deleted_at;
+  }),
+}));
 
 const childName = (child) => {
   if (!child) return 'Chưa có';

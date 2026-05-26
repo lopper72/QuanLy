@@ -3,29 +3,18 @@
     <table class="min-w-full divide-y divide-gray-200">
       <thead class="bg-gray-50">
         <tr>
-          <th class="w-10 px-6 py-3 text-left text-xs font-medium text-gray-500">
-            Thứ tự
-          </th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500">
-            Bài tập
-          </th>
-          <th class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500">
-            Thời lượng
-          </th>
-          <th class="w-44 px-6 py-3 text-left text-xs font-medium text-gray-500">
-            Trạng thái
-          </th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500">
-            Ghi chú chuyên viên
-          </th>
-          <th v-if="!readOnly" class="w-24 px-6 py-3 text-right text-xs font-medium text-gray-500">
-            Thao tác
-          </th>
+          <th class="w-10 px-6 py-3 text-left text-xs font-medium text-gray-500">Thứ tự</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500">Bài tập</th>
+          <th class="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500">Thời lượng</th>
+          <th class="w-44 px-6 py-3 text-left text-xs font-medium text-gray-500">Trạng thái</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500">Ghi chú chuyên viên</th>
+          <th v-if="showBehaviorAction" class="w-44 px-6 py-3 text-left text-xs font-medium text-gray-500">Hành vi</th>
+          <th v-if="!readOnly" class="w-24 px-6 py-3 text-right text-xs font-medium text-gray-500">Thao tác</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-200 bg-white">
         <tr v-if="items.length === 0">
-          <td colspan="6" class="px-6 py-10 text-center text-sm text-gray-500">
+          <td :colspan="emptyColspan" class="px-6 py-10 text-center text-sm text-gray-500">
             Chưa có bài tập nào trong buổi này.
           </td>
         </tr>
@@ -61,12 +50,8 @@
             <div class="flex items-center gap-3">
               <ExerciseThumbnail :exercise="item.exercise || item" size="sm" :alt="item.title || item.exercise?.title || 'Bài tập'" />
               <div class="min-w-0">
-                <div class="font-medium text-gray-900">
-                  {{ item.title || item.exercise?.title }}
-                </div>
-                <div class="text-xs text-gray-500">
-                  {{ categoryLabel(item.category || item.exercise?.category) }}
-                </div>
+                <div class="font-medium text-gray-900">{{ item.title || item.exercise?.title }}</div>
+                <div class="text-xs text-gray-500">{{ categoryLabel(item.category || item.exercise?.category) }}</div>
               </div>
             </div>
           </td>
@@ -81,9 +66,7 @@
               />
               <span class="text-xs text-gray-500">phút</span>
             </div>
-            <span v-else class="font-medium text-gray-900">
-              {{ item.duration_minutes }} phút
-            </span>
+            <span v-else class="font-medium text-gray-900">{{ item.duration_minutes }} phút</span>
           </td>
 
           <td class="whitespace-nowrap px-6 py-4 text-sm">
@@ -93,11 +76,7 @@
               class="rounded border-gray-300 px-2 py-1 text-xs focus:border-indigo-500 focus:ring-indigo-500"
               @change="readOnly && $emit('update-item-status', item, item.completion_status)"
             >
-              <option
-                v-for="option in itemStatusOptions"
-                :key="option.value"
-                :value="option.value"
-              >
+              <option v-for="option in itemStatusOptions" :key="option.value" :value="option.value">
                 {{ option.label }}
               </option>
             </select>
@@ -117,6 +96,15 @@
             </span>
           </td>
 
+          <td v-if="showBehaviorAction" class="whitespace-nowrap px-6 py-4 text-sm">
+            <Link
+              :href="route('behavior.create', { training_session_id: behaviorSessionId, training_session_item_id: item.id })"
+              class="inline-flex items-center rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+            >
+              Ghi nhận hành vi
+            </Link>
+          </td>
+
           <td v-if="!readOnly" class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
             <button type="button" class="text-red-600 hover:text-red-900" @click="removeItem(index)">
               Xóa
@@ -129,6 +117,8 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
+import { Link } from '@inertiajs/vue3';
 import TrainingStatusBadge from './TrainingStatusBadge.vue';
 import ExerciseThumbnail from '@/Components/exercises/ExerciseThumbnail.vue';
 import { categoryLabels, itemStatusLabels, labelFor } from '@/Lib/labels';
@@ -146,9 +136,16 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  behaviorSessionId: {
+    type: [Number, String],
+    default: null,
+  },
 });
 
 const emit = defineEmits(['update:items', 'remove-item', 'update-item-status']);
+
+const showBehaviorAction = computed(() => props.readOnly && !!props.behaviorSessionId);
+const emptyColspan = computed(() => 5 + (showBehaviorAction.value ? 1 : 0) + (!props.readOnly ? 1 : 0));
 
 const itemStatusOptions = [
   { value: 'not_started', label: labelFor(itemStatusLabels, 'not_started') },
@@ -171,8 +168,8 @@ function moveUp(index) {
   const item = list[index];
   list.splice(index, 1);
   list.splice(index - 1, 0, item);
-  list.forEach((itm, idx) => {
-    itm.sort_order = idx + 1;
+  list.forEach((entry, idx) => {
+    entry.sort_order = idx + 1;
   });
   emit('update:items', list);
 }
@@ -183,8 +180,8 @@ function moveDown(index) {
   const item = list[index];
   list.splice(index, 1);
   list.splice(index + 1, 0, item);
-  list.forEach((itm, idx) => {
-    itm.sort_order = idx + 1;
+  list.forEach((entry, idx) => {
+    entry.sort_order = idx + 1;
   });
   emit('update:items', list);
 }

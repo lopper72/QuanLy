@@ -16,6 +16,47 @@
       </div>
 
       <section class="rounded-lg bg-white p-5 shadow">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div class="max-w-3xl">
+            <h2 class="text-lg font-semibold text-gray-900">Gợi ý bữa tối qua Telegram</h2>
+            <p class="mt-1 text-sm text-gray-600">Hệ thống tự gửi gợi ý bữa tối lúc 14:00 mỗi ngày. Có thể gửi thử hoặc xem trước nội dung tại đây.</p>
+          </div>
+          <form class="flex flex-col gap-2 sm:flex-row" @submit.prevent="sendDinnerSuggestion">
+            <select v-model="mealTelegramForm.child_id" class="rounded-md border-gray-300 text-sm shadow-sm" required>
+              <option value="">Chọn bé</option>
+              <option v-for="child in mealSuggestion.children" :key="child.id" :value="child.id">
+                {{ child.full_name }} - {{ child.telegram_linked ? 'Đã liên kết Telegram' : 'Chưa liên kết Telegram' }}
+              </option>
+            </select>
+            <button type="submit" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+              Gửi thử gợi ý bữa tối
+            </button>
+          </form>
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div class="rounded-md border border-gray-200 bg-gray-50 p-3">
+            <h3 class="text-sm font-semibold text-gray-900">Xem trước tin nhắn 14:00</h3>
+            <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap text-sm leading-6 text-gray-700">{{ mealSuggestion.preview_message }}</pre>
+          </div>
+          <div class="rounded-md border border-gray-200 bg-gray-50 p-3">
+            <h3 class="text-sm font-semibold text-gray-900">Món thay thế</h3>
+            <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap text-sm leading-6 text-gray-700">{{ mealSuggestion.alternative_message || 'Chưa có dữ liệu' }}</pre>
+            <button type="button" class="mt-3 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white" @click="sendAlternativeDinner">
+              Gửi món thay thế
+            </button>
+          </div>
+          <div class="rounded-md border border-gray-200 bg-gray-50 p-3">
+            <h3 class="text-sm font-semibold text-gray-900">Lịch hôm nay</h3>
+            <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap text-sm leading-6 text-gray-700">{{ mealSuggestion.today_message || 'Chưa có dữ liệu' }}</pre>
+            <button type="button" class="mt-3 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white" @click="sendTodayMealSchedule">
+              Gửi lịch hôm nay
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="rounded-lg bg-white p-5 shadow">
         <h2 class="text-lg font-semibold text-gray-900">Ghi nhận hôm nay</h2>
         <form class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2" @submit.prevent="submitLog">
           <div>
@@ -116,6 +157,7 @@ const props = defineProps({
   recentLogs: { type: Array, default: () => [] },
   safetyNote: { type: String, required: true },
   supportNote: { type: String, required: true },
+  mealSuggestion: { type: Object, required: true },
 });
 
 const days = [
@@ -140,6 +182,10 @@ const logForm = useForm({
   notes: '',
 });
 
+const mealTelegramForm = useForm({
+  child_id: props.mealSuggestion.children?.[0]?.id || '',
+});
+
 function applyTemplate(templateId) {
   router.post(route('mealPlans.apply'), {
     meal_plan_template_id: templateId,
@@ -152,6 +198,18 @@ function submitLog() {
     preserveScroll: true,
     onSuccess: () => logForm.reset('stool_note', 'water_note', 'notes'),
   });
+}
+
+function sendDinnerSuggestion() {
+  mealTelegramForm.post(route('mealPlans.telegram.dinnerSuggestion'), { preserveScroll: true });
+}
+
+function sendAlternativeDinner() {
+  mealTelegramForm.post(route('mealPlans.telegram.alternativeDinner'), { preserveScroll: true });
+}
+
+function sendTodayMealSchedule() {
+  mealTelegramForm.post(route('mealPlans.telegram.todaySchedule'), { preserveScroll: true });
 }
 
 function itemsForDay(template, day) {

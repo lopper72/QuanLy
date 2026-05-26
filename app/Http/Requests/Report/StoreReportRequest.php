@@ -17,7 +17,9 @@ class StoreReportRequest extends FormRequest
         return [
             'child_id' => [
                 'required',
-                Rule::exists('children', 'id')->where(fn ($query) => $query->where('status', 'active')),
+                Rule::exists('children', 'id')->where(fn ($query) => $query
+                    ->where('status', 'active')
+                    ->whereNull('deleted_at')),
             ],
             'report_type' => ['required', 'string', 'in:daily,weekly,monthly,custom'],
             'report_date' => ['required', 'date'],

@@ -4,6 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\BehaviorLog;
 use App\Models\Child;
+use App\Models\Exercise;
+use App\Models\TrainingSession;
+use App\Models\TrainingSessionItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -45,15 +48,36 @@ class BehaviorControllerTest extends TestCase
         );
     }
 
+    public function test_behavior_page_has_clear_create_button(): void
+    {
+        Child::factory()->create(['status' => 'active']);
+
+        $response = $this->get('/behavior');
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Behavior/Index')
+            ->has('activeChildren', 1)
+        );
+
+        $this->assertStringContainsString(
+            '+ Ghi nhận hành vi',
+            file_get_contents(resource_path('js/Pages/Behavior/Index.vue'))
+        );
+    }
+
     public function test_behavior_default_excludes_paused_and_voided_children(): void
     {
         $activeChild = Child::factory()->create(['status' => 'active']);
         $pausedChild = Child::factory()->create(['status' => 'paused']);
         $voidedChild = Child::factory()->create(['status' => 'voided']);
+        $deletedChild = Child::factory()->create(['status' => 'active']);
 
         BehaviorLog::factory()->create(['child_id' => $activeChild->id]);
         BehaviorLog::factory()->create(['child_id' => $pausedChild->id]);
         BehaviorLog::factory()->create(['child_id' => $voidedChild->id]);
+        BehaviorLog::factory()->create(['child_id' => $deletedChild->id]);
+        $deletedChild->delete();
 
         $response = $this->get('/behavior');
 
@@ -69,7 +93,7 @@ class BehaviorControllerTest extends TestCase
         );
     }
 
-    public function test_behavior_voided_filter_shows_voided_historical_logs(): void
+    public function test_behavior_voided_filter_does_not_show_voided_historical_logs(): void
     {
         $activeChild = Child::factory()->create(['status' => 'active']);
         $voidedChild = Child::factory()->create(['status' => 'voided']);
@@ -82,17 +106,17 @@ class BehaviorControllerTest extends TestCase
         $response->assertStatus(200);
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Behavior/Index')
-            ->where('filters.child_status', 'voided')
+            ->where('filters.child_status', 'active')
             ->has('behaviorLogs', 1)
-            ->where('behaviorLogs.0.child.id', $voidedChild->id)
+            ->where('behaviorLogs.0.child.id', $activeChild->id)
             ->has('behaviorGroups', 1)
-            ->where('behaviorGroups.0.child.status', 'voided')
+            ->where('behaviorGroups.0.child.status', 'active')
             ->has('children', 1)
-            ->where('children.0.id', $voidedChild->id)
+            ->where('children.0.id', $activeChild->id)
         );
     }
 
-    public function test_behavior_all_filter_shows_all_historical_logs(): void
+    public function test_behavior_all_filter_still_only_shows_active_children(): void
     {
         $activeChild = Child::factory()->create(['status' => 'active']);
         $pausedChild = Child::factory()->create(['status' => 'paused']);
@@ -107,10 +131,11 @@ class BehaviorControllerTest extends TestCase
         $response->assertStatus(200);
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Behavior/Index')
-            ->where('filters.child_status', 'all')
-            ->has('behaviorLogs', 3)
-            ->has('behaviorGroups', 3)
-            ->has('children', 3)
+            ->where('filters.child_status', 'active')
+            ->has('behaviorLogs', 1)
+            ->where('behaviorLogs.0.child.id', $activeChild->id)
+            ->has('behaviorGroups', 1)
+            ->has('children', 1)
         );
     }
 
@@ -207,6 +232,11 @@ class BehaviorControllerTest extends TestCase
             'status' => 'voided',
             'full_name' => 'Bé đã ngừng',
         ]);
+        $deletedChild = Child::factory()->create([
+            'status' => 'active',
+            'full_name' => 'Bé đã xóa',
+        ]);
+        $deletedChild->delete();
 
         $response = $this->get('/behavior/create');
 
@@ -250,6 +280,96 @@ class BehaviorControllerTest extends TestCase
         ]);
     }
 
+    public function test_can_create_behavior_log_linked_to_training_session(): void
+    {
+        $child = Child::factory()->create(['status' => 'active']);
+        $session = TrainingSession::factory()->create(['child_id' => $child->id]);
+
+        $response = $this->post('/behavior', [
+            'child_id' => $child->id,
+            'training_session_id' => $session->id,
+            'behavior_type' => 'avoidance',
+            'severity' => 'medium',
+            'recorded_at' => now()->format('Y-m-d H:i:s'),
+            'trigger' => 'Bé né tránh khi chuyển bài tập',
+        ]);
+
+        $response->assertRedirect('/behavior');
+        $this->assertDatabaseHas('behavior_logs', [
+            'child_id' => $child->id,
+            'training_session_id' => $session->id,
+            'behavior_type' => 'avoidance',
+        ]);
+    }
+
+    public function test_can_create_behavior_log_linked_to_training_session_item(): void
+    {
+        $child = Child::factory()->create(['status' => 'active']);
+        $exercise = Exercise::factory()->create(['title' => 'Bật nhảy trên thảm']);
+        $session = TrainingSession::factory()->create(['child_id' => $child->id]);
+        $item = TrainingSessionItem::factory()->create([
+            'training_session_id' => $session->id,
+            'exercise_id' => $exercise->id,
+        ]);
+
+        $response = $this->post('/behavior', [
+            'child_id' => $child->id,
+            'training_session_id' => $session->id,
+            'training_session_item_id' => $item->id,
+            'behavior_type' => 'sensory_seeking',
+            'severity' => 'low',
+            'recorded_at' => now()->format('Y-m-d H:i:s'),
+        ]);
+
+        $response->assertRedirect('/behavior');
+        $this->assertDatabaseHas('behavior_logs', [
+            'child_id' => $child->id,
+            'training_session_id' => $session->id,
+            'training_session_item_id' => $item->id,
+            'behavior_type' => 'sensory_seeking',
+        ]);
+    }
+
+    public function test_mismatched_child_and_training_session_is_rejected(): void
+    {
+        $child = Child::factory()->create(['status' => 'active']);
+        $otherChild = Child::factory()->create(['status' => 'active']);
+        $session = TrainingSession::factory()->create(['child_id' => $otherChild->id]);
+
+        $response = $this->from('/behavior/create')->post('/behavior', [
+            'child_id' => $child->id,
+            'training_session_id' => $session->id,
+            'behavior_type' => 'tantrum',
+            'severity' => 'high',
+            'recorded_at' => now()->format('Y-m-d H:i:s'),
+        ]);
+
+        $response->assertRedirect('/behavior/create');
+        $response->assertSessionHasErrors(['training_session_id']);
+        $this->assertDatabaseCount('behavior_logs', 0);
+    }
+
+    public function test_mismatched_training_session_item_is_rejected(): void
+    {
+        $child = Child::factory()->create(['status' => 'active']);
+        $session = TrainingSession::factory()->create(['child_id' => $child->id]);
+        $otherSession = TrainingSession::factory()->create(['child_id' => $child->id]);
+        $item = TrainingSessionItem::factory()->create(['training_session_id' => $otherSession->id]);
+
+        $response = $this->from('/behavior/create')->post('/behavior', [
+            'child_id' => $child->id,
+            'training_session_id' => $session->id,
+            'training_session_item_id' => $item->id,
+            'behavior_type' => 'tantrum',
+            'severity' => 'high',
+            'recorded_at' => now()->format('Y-m-d H:i:s'),
+        ]);
+
+        $response->assertRedirect('/behavior/create');
+        $response->assertSessionHasErrors(['training_session_item_id']);
+        $this->assertDatabaseCount('behavior_logs', 0);
+    }
+
     public function test_invalid_behavior_log_fails_validation(): void
     {
         $response = $this->from('/behavior/create')->post('/behavior', [
@@ -283,6 +403,37 @@ class BehaviorControllerTest extends TestCase
             ->where('behaviorLogs.0.behavior_type', 'picky_eating')
             ->has('behaviorGroups', 1)
             ->where('behaviorGroups.0.logs.0.id', $log->id)
+        );
+    }
+
+    public function test_linked_behavior_shows_training_context_in_timeline_props(): void
+    {
+        $child = Child::factory()->create(['status' => 'active']);
+        $exercise = Exercise::factory()->create(['title' => 'Nhìn mắt khi gọi tên']);
+        $session = TrainingSession::factory()->create([
+            'child_id' => $child->id,
+            'session_date' => '2026-05-26',
+            'scheduled_time' => '08:00',
+        ]);
+        $item = TrainingSessionItem::factory()->create([
+            'training_session_id' => $session->id,
+            'exercise_id' => $exercise->id,
+        ]);
+        $log = BehaviorLog::factory()->create([
+            'child_id' => $child->id,
+            'training_session_id' => $session->id,
+            'training_session_item_id' => $item->id,
+            'behavior_type' => 'tantrum',
+        ]);
+
+        $response = $this->get('/behavior');
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Behavior/Index')
+            ->where('behaviorGroups.0.logs.0.id', $log->id)
+            ->where('behaviorGroups.0.logs.0.training_session.id', $session->id)
+            ->where('behaviorGroups.0.logs.0.training_session_item.exercise.title', 'Nhìn mắt khi gọi tên')
         );
     }
 
@@ -448,8 +599,10 @@ class BehaviorControllerTest extends TestCase
     {
         $pausedChild = Child::factory()->create(['status' => 'paused']);
         $voidedChild = Child::factory()->create(['status' => 'voided']);
+        $deletedChild = Child::factory()->create(['status' => 'active']);
+        $deletedChild->delete();
 
-        foreach ([$pausedChild, $voidedChild] as $child) {
+        foreach ([$pausedChild, $voidedChild, $deletedChild] as $child) {
             $response = $this->from('/behavior/create')->post('/behavior', [
                 'child_id' => $child->id,
                 'behavior_type' => 'tantrum',

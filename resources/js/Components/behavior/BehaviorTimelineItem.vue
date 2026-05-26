@@ -13,12 +13,20 @@
       </div>
 
       <dl class="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
+        <div v-if="log.training_session">
+          <dt class="text-xs font-semibold text-slate-400">Liên quan buổi tập</dt>
+          <dd class="mt-1 text-slate-700">{{ formatTrainingSession(log.training_session) }}</dd>
+        </div>
+        <div v-if="log.training_session_item?.exercise">
+          <dt class="text-xs font-semibold text-slate-400">Bài tập</dt>
+          <dd class="mt-1 text-slate-700">{{ log.training_session_item.exercise.title }}</dd>
+        </div>
         <div v-if="log.trigger">
-          <dt class="text-xs font-semibold text-slate-400">Yếu tố kích hoạt</dt>
+          <dt class="text-xs font-semibold text-slate-400">Nguyên nhân/kích hoạt</dt>
           <dd class="mt-1 text-slate-700">{{ log.trigger }}</dd>
         </div>
         <div v-if="log.response">
-          <dt class="text-xs font-semibold text-slate-400">Cách hỗ trợ</dt>
+          <dt class="text-xs font-semibold text-slate-400">Cách xử lý</dt>
           <dd class="mt-1 text-slate-700">{{ log.response }}</dd>
         </div>
         <div v-if="log.note">
@@ -70,4 +78,13 @@ const severityClass = computed(() => {
 
   return classes[props.log.severity] || 'bg-slate-50 text-slate-700 border border-slate-200';
 });
+
+function formatTrainingSession(session) {
+  const date = session.session_date
+    ? new Date(session.session_date).toLocaleDateString('vi-VN')
+    : 'chưa xác định';
+  const time = session.scheduled_time ? ` ${String(session.scheduled_time).slice(0, 5)}` : '';
+
+  return `${date}${time}`;
+}
 </script>

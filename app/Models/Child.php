@@ -138,12 +138,20 @@ class Child extends Model
 
     public function scopeActive($query)
     {
-        return $query->where('status', self::STATUS_ACTIVE);
+        return $query->where('status', self::STATUS_ACTIVE)
+            ->whereNull($this->getQualifiedDeletedAtColumn());
+    }
+
+    public function scopeActiveForWorkflow($query)
+    {
+        return $query->where('status', self::STATUS_ACTIVE)
+            ->whereNull($this->getQualifiedDeletedAtColumn());
     }
 
     public function scopePaused($query)
     {
-        return $query->where('status', self::STATUS_PAUSED);
+        return $query->where('status', self::STATUS_PAUSED)
+            ->whereNull($this->getQualifiedDeletedAtColumn());
     }
 
     public function scopeStopped($query)
@@ -158,11 +166,13 @@ class Child extends Model
 
     public function scopeVoided($query)
     {
-        return $query->where('status', self::STATUS_VOIDED);
+        return $query->where('status', self::STATUS_VOIDED)
+            ->whereNull($this->getQualifiedDeletedAtColumn());
     }
 
     public function scopeNotVoided($query)
     {
-        return $query->where('status', '!=', self::STATUS_VOIDED);
+        return $query->where('status', '!=', self::STATUS_VOIDED)
+            ->whereNull($this->getQualifiedDeletedAtColumn());
     }
 }

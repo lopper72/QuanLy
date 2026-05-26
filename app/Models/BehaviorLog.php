@@ -12,6 +12,8 @@ class BehaviorLog extends Model
 
     protected $fillable = [
         'child_id',
+        'training_session_id',
+        'training_session_item_id',
         'behavior_type',
         'severity',
         'trigger',
@@ -27,6 +29,16 @@ class BehaviorLog extends Model
     public function child()
     {
         return $this->belongsTo(Child::class);
+    }
+
+    public function trainingSession()
+    {
+        return $this->belongsTo(TrainingSession::class);
+    }
+
+    public function trainingSessionItem()
+    {
+        return $this->belongsTo(TrainingSessionItem::class);
     }
 
     public function scopeRecent($query)

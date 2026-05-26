@@ -9,7 +9,7 @@
           class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
         >
           <option value="">Tất cả trẻ</option>
-          <option v-for="child in children" :key="child.id" :value="child.id">
+          <option v-for="child in safeChildren" :key="child.id" :value="child.id">
             {{ child.first_name }} {{ child.last_name }}
           </option>
         </select>
@@ -70,7 +70,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
   children: {
@@ -88,6 +88,10 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['filter']);
+
+const safeChildren = computed(() => props.children.filter((child) => {
+  return child && child.status === 'active' && !child.deleted_at;
+}));
 
 const localFilters = ref({
   child_id: props.filters.child_id || '',

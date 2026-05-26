@@ -15,7 +15,12 @@ class UpdateBehaviorRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'child_id' => ['required', 'exists:children,id'],
+            'child_id' => [
+                'required',
+                Rule::exists('children', 'id')->where(fn ($query) => $query
+                    ->where('status', 'active')
+                    ->whereNull('deleted_at')),
+            ],
             'behavior_type' => [
                 'required',
                 'string',

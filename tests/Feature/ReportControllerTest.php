@@ -57,11 +57,36 @@ class ReportControllerTest extends TestCase
         );
     }
 
+    public function test_reports_exclude_voided_and_deleted_children(): void
+    {
+        $activeChild = Child::factory()->create(['status' => 'active']);
+        $voidedChild = Child::factory()->create(['status' => 'voided']);
+        $deletedChild = Child::factory()->create(['status' => 'active']);
+
+        Report::factory()->create(['child_id' => $activeChild->id]);
+        Report::factory()->create(['child_id' => $voidedChild->id]);
+        Report::factory()->create(['child_id' => $deletedChild->id]);
+        $deletedChild->delete();
+
+        $response = $this->get('/reports');
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Reports/Index')
+            ->has('reports.data', 1)
+            ->where('reports.data.0.child.id', $activeChild->id)
+            ->has('children', 1)
+            ->where('children.0.id', $activeChild->id)
+        );
+    }
+
     public function test_report_create_child_dropdown_only_includes_active_children(): void
     {
         $activeChild = Child::factory()->create(['status' => 'active']);
         Child::factory()->create(['status' => 'paused']);
         Child::factory()->create(['status' => 'voided']);
+        $deletedChild = Child::factory()->create(['status' => 'active']);
+        $deletedChild->delete();
 
         $response = $this->get('/reports/create');
 
@@ -77,8 +102,10 @@ class ReportControllerTest extends TestCase
     {
         $pausedChild = Child::factory()->create(['status' => 'paused']);
         $voidedChild = Child::factory()->create(['status' => 'voided']);
+        $deletedChild = Child::factory()->create(['status' => 'active']);
+        $deletedChild->delete();
 
-        foreach ([$pausedChild, $voidedChild] as $child) {
+        foreach ([$pausedChild, $voidedChild, $deletedChild] as $child) {
             $response = $this->post('/reports', [
                 'child_id' => $child->id,
                 'report_type' => 'weekly',

@@ -7,14 +7,18 @@
             :href="route('training.index')"
             class="inline-flex items-center text-xs font-semibold text-indigo-600 hover:underline"
           >
-            ← Quay lại tập luyện hằng ngày
+            &larr; Quay lại tập luyện hằng ngày
           </Link>
-          <h1 class="mt-2 text-3xl font-bold leading-tight text-gray-900">
-            Chi tiết buổi tập
-          </h1>
+          <h1 class="mt-2 text-3xl font-bold leading-tight text-gray-900">Chi tiết buổi tập</h1>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
+          <Link
+            :href="route('behavior.create', { training_session_id: session.id })"
+            class="inline-flex items-center rounded-md border border-indigo-300 bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          >
+            Ghi nhận hành vi trong buổi tập
+          </Link>
           <button
             type="button"
             class="inline-flex items-center rounded-md border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
@@ -40,13 +44,11 @@
 
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="space-y-4 rounded-lg border border-gray-100 bg-white p-6 shadow lg:col-span-1">
-          <h3 class="border-b border-gray-200 pb-2 text-lg font-medium text-gray-900">
-            Tổng quan buổi tập
-          </h3>
+          <h3 class="border-b border-gray-200 pb-2 text-lg font-medium text-gray-900">Tổng quan buổi tập</h3>
 
           <div class="space-y-3">
             <div>
-              <span class="block text-xs font-medium text-gray-500">Trẻ em</span>
+              <span class="block text-xs font-medium text-gray-500">Trẻ</span>
               <Link
                 v-if="session.child_id"
                 :href="route('children.show', session.child_id)"
@@ -76,11 +78,7 @@
                   class="rounded border-gray-300 py-1 text-xs focus:border-indigo-500 focus:ring-indigo-500"
                   @change="updateOverallStatus"
                 >
-                  <option
-                    v-for="option in sessionStatusOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
+                  <option v-for="option in sessionStatusOptions" :key="option.value" :value="option.value">
                     {{ option.label }}
                   </option>
                 </select>
@@ -89,16 +87,12 @@
 
             <div>
               <span class="block text-xs font-medium text-gray-500">Tổng thời gian dự kiến</span>
-              <span class="text-sm font-semibold text-gray-900">
-                {{ session.total_minutes || 0 }} phút
-              </span>
+              <span class="text-sm font-semibold text-gray-900">{{ session.total_minutes || 0 }} phút</span>
             </div>
 
             <div>
               <span class="block text-xs font-medium text-gray-500">Được tạo lúc</span>
-              <span class="text-xs text-gray-600">
-                {{ formatDateWithTime(session.created_at) }}
-              </span>
+              <span class="text-xs text-gray-600">{{ formatDateWithTime(session.created_at) }}</span>
             </div>
           </div>
         </div>
@@ -106,7 +100,7 @@
         <div class="flex flex-col justify-between rounded-lg border border-gray-100 bg-white p-6 shadow lg:col-span-2">
           <div>
             <h3 class="mb-3 border-b border-gray-200 pb-2 text-lg font-medium text-gray-900">
-              Quan sát và ghi chú của chuyên gia
+              Quan sát và ghi chú của chuyên viên
             </h3>
             <p class="whitespace-pre-line text-sm text-gray-700">
               {{ session.notes || 'Không có ghi chú hoặc quan sát nào được ghi lại.' }}
@@ -119,15 +113,28 @@
         </div>
       </div>
 
+      <div class="rounded-lg border border-indigo-100 bg-indigo-50 p-4">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 class="text-sm font-semibold text-indigo-900">Ghi nhận hành vi trong buổi tập</h3>
+            <p class="mt-1 text-sm text-indigo-700">
+              Dùng khi bé có hành vi cần theo dõi trong lúc tập hoặc khi chuyển giữa các bài.
+            </p>
+          </div>
+          <Link
+            :href="route('behavior.create', { training_session_id: session.id })"
+            class="inline-flex justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+          >
+            Ghi nhận hành vi
+          </Link>
+        </div>
+      </div>
+
       <div class="overflow-hidden rounded-lg border border-gray-100 bg-white shadow">
         <div class="flex items-center justify-between border-b border-gray-200 px-6 py-5">
           <div>
-            <h3 class="text-lg font-medium text-gray-900">
-              Danh sách bài tập
-            </h3>
-            <p class="mt-1 text-xs text-gray-500">
-              Cập nhật trạng thái từng bài tập trong buổi.
-            </p>
+            <h3 class="text-lg font-medium text-gray-900">Danh sách bài tập</h3>
+            <p class="mt-1 text-xs text-gray-500">Cập nhật trạng thái từng bài tập trong buổi.</p>
           </div>
         </div>
 
@@ -135,6 +142,7 @@
           :items="session.items"
           :read-only="true"
           :allow-interactive-status="true"
+          :behavior-session-id="session.id"
           @update-item-status="handleUpdateItemStatus"
         />
       </div>

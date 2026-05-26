@@ -411,11 +411,13 @@ class ExerciseControllerTest extends TestCase
         Exercise::factory()->create([
             'title' => 'Bài vận động',
             'expected_benefits' => 'Tăng khả năng chờ đến lượt',
+            'instructions' => 'Không có từ khóa cần tìm.',
             'is_active' => true,
         ]);
         Exercise::factory()->create([
             'title' => 'Bài khác',
             'expected_benefits' => 'Tăng vận động thô',
+            'instructions' => 'Không có từ khóa cần tìm.',
             'is_active' => true,
         ]);
 

@@ -1,7 +1,7 @@
 <template>
   <div>
     <EmptyState
-      v-if="reports.data.length === 0"
+      v-if="safeReports.data.length === 0"
       title="Chưa có báo cáo"
       description="Bắt đầu bằng cách tạo báo cáo tổng hợp tiến độ mới."
     >
@@ -22,7 +22,7 @@
 
     <div v-else>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div v-for="report in reports.data" :key="report.id">
+        <div v-for="report in safeReports.data" :key="report.id">
           <ReportCard :report="report" @delete="$emit('delete', $event)" />
         </div>
       </div>
@@ -53,16 +53,24 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import EmptyState from '../ui/EmptyState.vue';
 import ReportCard from './ReportCard.vue';
 
-defineProps({
+const props = defineProps({
   reports: {
     type: Object,
     required: true,
   },
 });
+
+const safeReports = computed(() => ({
+  ...props.reports,
+  data: (props.reports.data || []).filter((report) => {
+    return report.child && report.child.status === 'active' && !report.child.deleted_at;
+  }),
+}));
 
 defineEmits(['delete']);
 </script>

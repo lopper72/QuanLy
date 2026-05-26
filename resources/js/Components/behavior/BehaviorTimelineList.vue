@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-4">
     <EmptyState
-      v-if="groups.length === 0"
+      v-if="safeGroups.length === 0"
       title="Chưa có ghi nhận hành vi"
       description="Không có ghi nhận hành vi nào phù hợp với bộ lọc hiện tại."
     >
@@ -14,7 +14,7 @@
 
     <template v-else>
       <BehaviorTimelineGroup
-        v-for="group in groups"
+        v-for="group in safeGroups"
         :key="group.child?.id || 'unknown'"
         :group="group"
       />
@@ -23,13 +23,18 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import EmptyState from '../ui/EmptyState.vue';
 import BehaviorTimelineGroup from './BehaviorTimelineGroup.vue';
 
-defineProps({
+const props = defineProps({
   groups: {
     type: Array,
     required: true,
   },
 });
+
+const safeGroups = computed(() => props.groups.filter((group) => {
+  return group.child && group.child.status === 'active' && !group.child.deleted_at;
+}));
 </script>

@@ -271,6 +271,26 @@ class TelegramService
         return $response;
     }
 
+    public function setMyCommands(array $commands): ?Response
+    {
+        $token = $this->botToken();
+        if (blank($token)) {
+            return null;
+        }
+
+        $response = Http::timeout(15)->post("https://api.telegram.org/bot{$token}/setMyCommands", [
+            'commands' => $commands,
+        ]);
+
+        Log::info('Telegram setMyCommands response', [
+            'successful' => $response->successful(),
+            'status' => $response->status(),
+            'response' => $response->json(),
+        ]);
+
+        return $response;
+    }
+
     public function editMessageReplyMarkup(string|int $chatId, string|int $messageId, array $replyMarkup = []): ?Response
     {
         $token = $this->botToken();

@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\SendTelegramMessageJob;
-use App\Models\Child;
-use App\Services\TelegramTrainingNotificationService;
-use App\Services\TelegramService;
+use App\Services\TelegramCommandService;
+use App\Services\TelegramMealSuggestionService;
 use App\Services\TelegramReminderService;
+use App\Services\TelegramService;
+use App\Services\TelegramTrainingNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -17,10 +18,11 @@ class TelegramWebhookController extends Controller
     public function __invoke(
         Request $request,
         TelegramService $telegramService,
+        TelegramCommandService $telegramCommandService,
         TelegramTrainingNotificationService $trainingNotificationService,
-        TelegramReminderService $reminderService
-    ): JsonResponse
-    {
+        TelegramReminderService $reminderService,
+        TelegramMealSuggestionService $mealSuggestionService
+    ): JsonResponse {
         Log::info('Telegram webhook received', [
             'has_message' => $request->has('message'),
             'has_callback_query' => $request->has('callback_query'),
@@ -36,11 +38,11 @@ class TelegramWebhookController extends Controller
         $telegramService->processWebhook($request->all());
 
         if ($request->has('message')) {
-            $this->handleMessage($request, $telegramService, $trainingNotificationService, $reminderService);
+            $this->handleMessage($request, $telegramService, $telegramCommandService);
         }
 
         if ($request->has('callback_query')) {
-            $this->handleCallback($request, $telegramService, $trainingNotificationService, $reminderService);
+            $this->handleCallback($request, $telegramService, $trainingNotificationService, $reminderService, $mealSuggestionService);
         }
 
         return response()->json(['ok' => true]);
@@ -63,10 +65,8 @@ class TelegramWebhookController extends Controller
     protected function handleMessage(
         Request $request,
         TelegramService $telegramService,
-        TelegramTrainingNotificationService $trainingNotificationService,
-        TelegramReminderService $reminderService
-    ): void
-    {
+        TelegramCommandService $telegramCommandService
+    ): void {
         $chatId = $request->input('message.chat.id');
         $text = trim((string) $request->input('message.text', ''));
 
@@ -81,7 +81,7 @@ class TelegramWebhookController extends Controller
             if ($user) {
                 SendTelegramMessageJob::dispatch(
                     (string) $chatId,
-                    'Đã kết nối Telegram. Bạn sẽ nhận nhắc lịch checklist hằng ngày.',
+                    'Đã kết nối Telegram. Bạn sẽ nhận nhắc lịch hằng ngày.',
                     $telegramService->openChecklistKeyboard()
                 );
             }
@@ -89,27 +89,7 @@ class TelegramWebhookController extends Controller
             return;
         }
 
-        if ($text === '/today') {
-            $children = Child::query()
-                ->active()
-                ->whereHas('trainingSessions', fn ($query) => $query->whereDate('session_date', today()))
-                ->orderBy('full_name')
-                ->get();
-
-            if ($children->isEmpty()) {
-                $telegramService->sendMessage((string) $chatId, 'Hôm nay chưa có lịch tập nào.');
-
-                return;
-            }
-
-            foreach ($children as $child) {
-                try {
-                    $trainingNotificationService->sendTodayTrainingToChat($child, (string) $chatId);
-                } catch (\InvalidArgumentException $exception) {
-                    $telegramService->sendMessage((string) $chatId, $exception->getMessage());
-                }
-            }
-
+        if ($telegramCommandService->handleMessage($request->input('message', []))) {
             return;
         }
 
@@ -124,9 +104,9 @@ class TelegramWebhookController extends Controller
         Request $request,
         TelegramService $telegramService,
         TelegramTrainingNotificationService $trainingNotificationService,
-        TelegramReminderService $reminderService
-    ): void
-    {
+        TelegramReminderService $reminderService,
+        TelegramMealSuggestionService $mealSuggestionService
+    ): void {
         $callbackQueryId = $request->input('callback_query.id');
         $chatId = $request->input('callback_query.message.chat.id');
         $data = (string) $request->input('callback_query.data', '');
@@ -152,7 +132,7 @@ class TelegramWebhookController extends Controller
                 );
             }
 
-            $message = $trainingNotificationService->processCallback($request->input('callback_query', []));
+            $trainingNotificationService->processCallback($request->input('callback_query', []));
 
             return;
         }
@@ -169,6 +149,22 @@ class TelegramWebhookController extends Controller
             }
 
             $reminderService->handleSupplementCallback($request->input('callback_query', []));
+
+            return;
+        }
+
+        if (Str::startsWith($data, 'meal_suggestion:')) {
+            $parts = explode(':', $data);
+            $action = $parts[3] ?? '';
+
+            if ($callbackQueryId) {
+                $telegramService->answerCallbackQuery(
+                    $callbackQueryId,
+                    $mealSuggestionService->callbackFeedbackText($action)
+                );
+            }
+
+            $mealSuggestionService->handleCallback($request->input('callback_query', []));
 
             return;
         }

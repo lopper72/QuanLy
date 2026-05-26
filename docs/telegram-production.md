@@ -165,3 +165,36 @@ php artisan queue:work --tries=3
 - Gửi trùng: kiểm tra bảng `telegram_reminder_logs`; hệ thống có khóa chống trùng theo loại nhắc, đối tượng, giờ nhắc và chat id.
 - Callback bổ sung không nhận: kiểm tra webhook đang trỏ đúng `/telegram/webhook`, có `allowed_updates` gồm `callback_query`.
 - Lịch ăn không nhắc: kiểm tra `meal_plan_items.scheduled_time` đã có giờ cụ thể.
+
+## Gợi ý bữa tối lúc 14:00
+
+Hệ thống có lệnh gửi gợi ý bữa tối hỗ trợ tiêu hóa qua Telegram:
+
+```bash
+php artisan telegram:send-dinner-suggestions
+```
+
+Lệnh này được scheduler chạy hằng ngày lúc 14:00:
+
+```php
+Schedule::command('telegram:send-dinner-suggestions')->dailyAt('14:00');
+```
+
+Production vẫn cần cron Laravel scheduler:
+
+```cron
+* * * * * cd /path/to/project && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Bot hỗ trợ thêm:
+
+- `/an`: xem lịch ăn uống hôm nay.
+- `/doimon`: gợi ý món tối thay thế.
+
+Nếu không nhận được gợi ý bữa tối:
+
+- Kiểm tra cron `schedule:run` đang chạy.
+- Kiểm tra `TELEGRAM_BOT_TOKEN` và `default_chat_id`.
+- Kiểm tra trẻ còn trạng thái `active`.
+- Kiểm tra bảng `telegram_meal_suggestion_logs` để xem trạng thái `sent`, `failed`, `prepared`.
+- Kiểm tra webhook có nhận callback `meal_suggestion:*` khi phụ huynh bấm nút.
