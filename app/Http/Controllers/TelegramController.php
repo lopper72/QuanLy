@@ -16,6 +16,7 @@ use App\Models\SupplementSchedule;
 use App\Models\TrainingSession;
 use App\Models\TrainingSessionItem;
 use App\Services\TelegramService;
+use App\Services\TelegramCommandService;
 use App\Services\TelegramMealSuggestionService;
 use App\Services\TelegramReminderService;
 use App\Services\TelegramTrainingNotificationService;
@@ -382,6 +383,38 @@ class TelegramController extends Controller
     public function simulateDoimonCommand(Request $request, TelegramMealSuggestionService $service): RedirectResponse
     {
         return $this->testMealCommandDoimon($request, $service);
+    }
+
+    public function simulateQuickCommand(Request $request, TelegramCommandService $service): RedirectResponse
+    {
+        $validated = $request->validate([
+            'command' => ['required', 'string', 'in:/menu,/tap,/thuoc,/tiendo,/ditoilet,/uongnuoc'],
+        ]);
+
+        $chatId = TelegramSetting::current()->default_chat_id
+            ?: TelegramContact::query()->latest('last_seen_at')->value('telegram_chat_id');
+
+        if (blank($chatId)) {
+            return back()->with('error', 'Chưa có mã hội thoại Telegram để test.');
+        }
+
+        TelegramMessage::create([
+            'direction' => TelegramMessage::DIRECTION_INBOUND,
+            'telegram_chat_id' => (string) $chatId,
+            'message_type' => 'text',
+            'message_text' => $validated['command'],
+            'payload_json' => ['source' => 'telegram_test_center'],
+            'delivery_status' => TelegramMessage::STATUS_RECEIVED,
+            'received_at' => now(),
+        ]);
+
+        $service->handleMessage([
+            'text' => $validated['command'],
+            'chat' => ['id' => $chatId],
+            'from' => ['id' => $chatId, 'first_name' => 'Phụ huynh'],
+        ]);
+
+        return back()->with('success', "Đã giả lập lệnh {$validated['command']}.");
     }
 
     public function runDinnerCommand(): RedirectResponse

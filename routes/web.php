@@ -185,6 +185,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/test/send-supplement-reminder-now', [TelegramController::class, 'sendSupplementReminderNow'])->name('test.sendSupplementReminderNow');
         Route::post('/test/simulate-an-command', [TelegramController::class, 'simulateAnCommand'])->name('test.simulateAnCommand');
         Route::post('/test/simulate-doimon-command', [TelegramController::class, 'simulateDoimonCommand'])->name('test.simulateDoimonCommand');
+        Route::post('/test/quick-command', [TelegramController::class, 'simulateQuickCommand'])->name('test.quickCommand');
         Route::post('/test/run-dinner-command', [TelegramController::class, 'runDinnerCommand'])->name('test.runDinnerCommand');
         Route::post('/test/run-reminder-command', [TelegramController::class, 'runReminderCommand'])->name('test.runReminderCommand');
         Route::post('/demo/create-today-data', [TelegramController::class, 'createTodayDemoData'])->name('demo.createTodayData');

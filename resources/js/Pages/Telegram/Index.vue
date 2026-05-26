@@ -230,6 +230,22 @@
         </div>
 
         <div class="rounded-lg bg-white p-4 ring-1 ring-gray-200">
+          <h2 class="text-base font-semibold text-gray-900">Test lệnh nhanh</h2>
+          <p class="mt-1 text-sm text-gray-500">Giả lập các lệnh phụ huynh thường dùng để kiểm tra nội dung trả lời và nhật ký Telegram.</p>
+          <div class="mt-4 grid grid-cols-1 gap-2">
+            <button
+              v-for="command in quickCommands"
+              :key="command.value"
+              type="button"
+              class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              @click="postQuickCommand(command.value)"
+            >
+              {{ command.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="rounded-lg bg-white p-4 ring-1 ring-gray-200">
           <h2 class="text-base font-semibold text-gray-900">Nhật ký nhắc lịch gần đây</h2>
           <div class="mt-4 space-y-2">
             <div v-for="log in reminderTest.logs" :key="log.id" class="rounded-md border border-gray-200 p-3 text-sm">
@@ -307,10 +323,22 @@ const mealSuggestionForm = useForm({
 const schedulerForm = useForm({
   child_id: props.mealSuggestionTest.children?.[0]?.id || '',
 });
+const quickCommandForm = useForm({
+  command: '/menu',
+});
 const mealSuggestionActions = [
   { value: 'change', label: 'Giả lập bấm Đổi món khác' },
   { value: 'view', label: 'Giả lập bấm Xem lịch hôm nay' },
   { value: 'prepared', label: 'Giả lập bấm Đã chuẩn bị' },
+];
+
+const quickCommands = [
+  { value: '/menu', label: 'Test /menu' },
+  { value: '/tap', label: 'Test /tap' },
+  { value: '/thuoc', label: 'Test /thuoc' },
+  { value: '/tiendo', label: 'Test /tiendo' },
+  { value: '/ditoilet', label: 'Test /ditoilet' },
+  { value: '/uongnuoc', label: 'Test /uongnuoc' },
 ];
 
 function post(routeName) {
@@ -328,6 +356,11 @@ function postMealSuggestion(routeName) {
 function postMealCallback(action) {
   mealSuggestionForm.action = action;
   mealSuggestionForm.post(route('telegram.test.mealSuggestion.callback'), { preserveScroll: true });
+}
+
+function postQuickCommand(command) {
+  quickCommandForm.command = command;
+  quickCommandForm.post(route('telegram.test.quickCommand'), { preserveScroll: true });
 }
 
 function reminderTypeLabel(type) {

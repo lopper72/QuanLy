@@ -42,7 +42,7 @@ class TelegramWebhookController extends Controller
         }
 
         if ($request->has('callback_query')) {
-            $this->handleCallback($request, $telegramService, $trainingNotificationService, $reminderService, $mealSuggestionService);
+            $this->handleCallback($request, $telegramService, $telegramCommandService, $trainingNotificationService, $reminderService, $mealSuggestionService);
         }
 
         return response()->json(['ok' => true]);
@@ -103,6 +103,7 @@ class TelegramWebhookController extends Controller
     protected function handleCallback(
         Request $request,
         TelegramService $telegramService,
+        TelegramCommandService $telegramCommandService,
         TelegramTrainingNotificationService $trainingNotificationService,
         TelegramReminderService $reminderService,
         TelegramMealSuggestionService $mealSuggestionService
@@ -112,6 +113,36 @@ class TelegramWebhookController extends Controller
         $data = (string) $request->input('callback_query.data', '');
 
         if (blank($chatId) || blank($data)) {
+            return;
+        }
+
+        if (Str::startsWith($data, 'telegram_menu:')) {
+            if ($callbackQueryId) {
+                $telegramService->answerCallbackQuery($callbackQueryId, 'Đang mở chức năng');
+            }
+
+            $telegramCommandService->handleMenuCallback($request->input('callback_query', []));
+
+            return;
+        }
+
+        if (Str::startsWith($data, 'toilet:')) {
+            if ($callbackQueryId) {
+                $telegramService->answerCallbackQuery($callbackQueryId, 'Đã ghi nhận tình trạng đi tiêu');
+            }
+
+            $telegramCommandService->handleToiletCallback($request->input('callback_query', []));
+
+            return;
+        }
+
+        if (Str::startsWith($data, 'water:')) {
+            if ($callbackQueryId) {
+                $telegramService->answerCallbackQuery($callbackQueryId, 'Đã ghi nhận uống nước');
+            }
+
+            $telegramCommandService->handleWaterCallback($request->input('callback_query', []));
+
             return;
         }
 

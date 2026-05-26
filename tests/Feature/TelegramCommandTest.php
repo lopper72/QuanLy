@@ -13,6 +13,7 @@ use App\Models\TelegramMessage;
 use App\Models\TelegramSetting;
 use App\Models\TrainingSession;
 use App\Models\TrainingSessionItem;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -29,19 +30,19 @@ class TelegramCommandTest extends TestCase
         $this->fakeTelegram();
     }
 
-    public function test_help_command_returns_vietnamese_command_list(): void
+    public function test_menu_command_returns_parent_command_list(): void
     {
-        $this->postCommand('/help')->assertOk();
-
-        $this->assertDatabaseHas('telegram_messages', [
-            'direction' => TelegramMessage::DIRECTION_OUTBOUND,
-            'telegram_chat_id' => '6005717884',
-            'message_type' => 'text',
-        ]);
+        $this->postCommand('/menu')->assertOk();
 
         $message = TelegramMessage::where('direction', TelegramMessage::DIRECTION_OUTBOUND)->latest('id')->first();
-        $this->assertStringContainsString('/full - Xem toàn bộ lịch hôm nay', $message->message_text);
-        $this->assertStringContainsString('/thuoc - Xem lịch thuốc và bổ sung', $message->message_text);
+        $this->assertStringContainsString('Menu hỗ trợ phụ huynh', $message->message_text);
+        $this->assertStringContainsString('/an', $message->message_text);
+        $this->assertStringContainsString('/doimon', $message->message_text);
+        $this->assertStringContainsString('/ditoilet', $message->message_text);
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/sendMessage')
+            && data_get($request->data(), 'reply_markup.inline_keyboard.0.0.callback_data') === 'telegram_menu:today_meal'
+        );
     }
 
     public function test_full_command_returns_training_meal_and_supplement_schedule(): void
@@ -65,7 +66,7 @@ class TelegramCommandTest extends TestCase
 
         Http::assertSent(fn ($request) => str_contains($request->url(), '/sendMessage')
             && $request['chat_id'] === '6005717884'
-            && str_contains($request['text'], 'Lịch thuốc/bổ sung hôm nay')
+            && str_contains($request['text'], 'Lịch bổ sung hôm nay')
             && data_get($request->data(), 'reply_markup.inline_keyboard.0.0.callback_data') !== null
         );
     }
@@ -77,8 +78,31 @@ class TelegramCommandTest extends TestCase
         $this->postCommand('/an')->assertOk();
 
         $message = TelegramMessage::where('direction', TelegramMessage::DIRECTION_OUTBOUND)->latest('id')->first();
+        $this->assertStringContainsString('14:00', $message->message_text);
         $this->assertStringContainsString('07:00', $message->message_text);
         $this->assertStringContainsString('Cháo yến mạch', $message->message_text);
+    }
+
+    public function test_doimon_command_returns_alternative_dinner(): void
+    {
+        $this->createChildSchedule();
+
+        $this->postCommand('/doimon')->assertOk();
+
+        $message = TelegramMessage::where('direction', TelegramMessage::DIRECTION_OUTBOUND)->latest('id')->first();
+        $this->assertStringContainsString('Gợi ý món thay thế cho bữa tối hôm nay', $message->message_text);
+    }
+
+    public function test_tap_command_returns_today_training(): void
+    {
+        $this->createChildSchedule();
+
+        $this->postCommand('/tap')->assertOk();
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/sendMessage')
+            && str_contains($request['text'], 'Lịch tập hôm nay')
+            && str_contains($request['text'], 'Bật nhảy trên thảm')
+        );
     }
 
     public function test_progress_command_returns_today_summary(): void
@@ -92,8 +116,8 @@ class TelegramCommandTest extends TestCase
         $this->postCommand('/tiendo')->assertOk();
 
         $message = TelegramMessage::where('direction', TelegramMessage::DIRECTION_OUTBOUND)->latest('id')->first();
-        $this->assertStringContainsString('Tiến độ hôm nay', $message->message_text);
-        $this->assertStringContainsString('Bài tập: 1/1 đã hoàn thành', $message->message_text);
+        $this->assertStringContainsString('Tóm tắt gần đây', $message->message_text);
+        $this->assertStringContainsString('Bài tập: 1/1 đã hoàn thành hôm nay', $message->message_text);
         $this->assertStringContainsString('Bổ sung: 1/1 đã uống', $message->message_text);
     }
 
@@ -113,6 +137,55 @@ class TelegramCommandTest extends TestCase
 
         $this->assertStringContainsString($activeChild->full_name, $messages);
         $this->assertStringNotContainsString($voidedChild->full_name, $messages);
+    }
+
+    public function test_toilet_callback_creates_daily_tracking_log_without_duplicates(): void
+    {
+        $child = $this->createChildSchedule();
+
+        $this->postCallback('toilet:hard')->assertOk();
+        $this->postCallback('toilet:soft')->assertOk();
+
+        $this->assertSame(1, MealLog::query()
+            ->where('child_id', $child->id)
+            ->whereDate('meal_date', today())
+            ->whereNull('meal_plan_item_id')
+            ->count());
+
+        $this->assertDatabaseHas('meal_logs', [
+            'child_id' => $child->id,
+            'meal_plan_item_id' => null,
+            'stool_note' => 'Phân mềm, không đau.',
+        ]);
+    }
+
+    public function test_water_callback_creates_daily_tracking_log(): void
+    {
+        $child = $this->createChildSchedule();
+
+        $this->postCallback('water:little')->assertOk();
+
+        $this->assertDatabaseHas('meal_logs', [
+            'child_id' => $child->id,
+            'meal_plan_item_id' => null,
+            'water_note' => 'Hôm nay bé uống nước ít.',
+        ]);
+    }
+
+    public function test_menu_buttons_trigger_matching_command_services(): void
+    {
+        $this->createChildSchedule();
+
+        $this->postCallback('telegram_menu:today_meal')->assertOk();
+
+        $this->assertDatabaseHas('telegram_messages', [
+            'direction' => TelegramMessage::DIRECTION_INBOUND,
+            'message_type' => 'menu_callback',
+            'callback_data' => 'telegram_menu:today_meal',
+        ]);
+
+        $message = TelegramMessage::where('direction', TelegramMessage::DIRECTION_OUTBOUND)->latest('id')->first();
+        $this->assertStringContainsString('Lịch ăn uống hôm nay', $message->message_text);
     }
 
     public function test_id_and_hotro_commands_work(): void
@@ -136,11 +209,31 @@ class TelegramCommandTest extends TestCase
 
     public function test_set_commands_artisan_command_calls_telegram_api(): void
     {
-        $this->artisan('telegram:commands:set')->assertExitCode(0);
+        $this->artisan('telegram:set-commands')->assertExitCode(0);
 
         Http::assertSent(fn ($request) => str_contains($request->url(), '/setMyCommands')
-            && collect($request['commands'])->contains(fn ($command) => $command['command'] === 'full')
+            && collect($request['commands'])->contains(fn ($command) => $command['command'] === 'menu')
+            && collect($request['commands'])->contains(fn ($command) => $command['command'] === 'ditoilet')
         );
+    }
+
+    public function test_quick_command_test_route_requires_auth(): void
+    {
+        $this->post('/telegram/test/quick-command', ['command' => '/menu'])
+            ->assertRedirect('/login');
+    }
+
+    public function test_quick_command_test_route_sends_command_when_authenticated(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $this->post('/telegram/test/quick-command', ['command' => '/menu'])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('telegram_messages', [
+            'direction' => TelegramMessage::DIRECTION_INBOUND,
+            'message_text' => '/menu',
+        ]);
     }
 
     private function postCommand(string $command)
@@ -151,6 +244,21 @@ class TelegramCommandTest extends TestCase
                 'text' => $command,
                 'chat' => ['id' => 6005717884],
                 'from' => ['id' => 6005717884, 'first_name' => 'Phụ huynh'],
+            ],
+        ]);
+    }
+
+    private function postCallback(string $data)
+    {
+        return $this->postJson('/telegram/webhook', [
+            'callback_query' => [
+                'id' => 'callback-test',
+                'data' => $data,
+                'from' => ['id' => 6005717884, 'first_name' => 'Phụ huynh'],
+                'message' => [
+                    'date' => now()->timestamp,
+                    'chat' => ['id' => 6005717884],
+                ],
             ],
         ]);
     }

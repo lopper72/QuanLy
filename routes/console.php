@@ -253,6 +253,20 @@ Artisan::command('telegram:commands:set', function (TelegramService $telegramSer
     return $response->successful() ? 0 : 1;
 })->purpose('Đăng ký danh sách lệnh Telegram cho phụ huynh');
 
+Artisan::command('telegram:set-commands', function (TelegramService $telegramService, TelegramCommandService $commandService) {
+    $response = $telegramService->setMyCommands($commandService->commands());
+
+    if (!$response) {
+        $this->error('Chưa cấu hình bot token.');
+
+        return 1;
+    }
+
+    $this->line(json_encode($response->json(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+
+    return $response->successful() ? 0 : 1;
+})->purpose('Đăng ký menu lệnh Telegram cho phụ huynh');
+
 Schedule::command('telegram:send-reminders')->everyMinute();
 
 Artisan::command('telegram:send-due-reminders', function (TelegramReminderService $reminderService) {
