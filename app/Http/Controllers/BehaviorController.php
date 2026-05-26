@@ -209,9 +209,9 @@ class BehaviorController extends Controller
      */
     public function store(StoreBehaviorRequest $request): RedirectResponse
     {
-        $behaviorLog = $this->behaviorService->createBehaviorLog($request->validated());
+        $this->behaviorService->createBehaviorLog($request->validated());
 
-        return redirect()->route('behavior.show', $behaviorLog->id)
+        return redirect()->route('behavior.index')
             ->with('success', 'Đã ghi nhận hành vi.');
     }
 
@@ -238,7 +238,10 @@ class BehaviorController extends Controller
      */
     public function edit(BehaviorLog $behaviorLog): Response
     {
-        $children = Child::orderBy('full_name')->get(['id', 'full_name', 'status']);
+        $children = Child::notVoided()
+            ->orWhere('id', $behaviorLog->child_id)
+            ->orderBy('full_name')
+            ->get(['id', 'full_name', 'status']);
 
         return Inertia::render('Behavior/Edit', [
             'behaviorLog' => $behaviorLog,

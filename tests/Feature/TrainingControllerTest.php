@@ -88,7 +88,7 @@ class TrainingControllerTest extends TestCase
         Child::factory()->create(['full_name' => 'Paused Child', 'status' => 'paused']);
         Child::factory()->create(['full_name' => 'Voided Child', 'status' => 'voided']);
 
-        $response = $this->get('/training');
+        $response = $this->get('/training?child_status=all');
 
         $response->assertStatus(200);
         $response->assertInertia(fn (Assert $page) => $page
@@ -170,7 +170,7 @@ class TrainingControllerTest extends TestCase
             'session_date' => now()->subDays(5),
         ]);
 
-        $response = $this->get('/training');
+        $response = $this->get('/training?child_id=' . $voided->id);
 
         $response->assertStatus(200);
         $response->assertInertia(fn (Assert $page) => $page

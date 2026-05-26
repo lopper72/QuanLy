@@ -197,6 +197,28 @@ class BehaviorControllerTest extends TestCase
         );
     }
 
+    public function test_create_behavior_page_only_lists_active_children(): void
+    {
+        $activeChild = Child::factory()->create([
+            'status' => 'active',
+            'full_name' => 'Bé đang can thiệp',
+        ]);
+        Child::factory()->create([
+            'status' => 'voided',
+            'full_name' => 'Bé đã ngừng',
+        ]);
+
+        $response = $this->get('/behavior/create');
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Behavior/Create')
+            ->has('children', 1)
+            ->where('children.0.id', $activeChild->id)
+            ->where('children.0.full_name', 'Bé đang can thiệp')
+        );
+    }
+
     /**
      * Test storing behavior log successfully.
      */
@@ -215,8 +237,10 @@ class BehaviorControllerTest extends TestCase
 
         $response = $this->post('/behavior', $payload);
 
-        $newLog = BehaviorLog::first();
-        $response->assertRedirect("/behavior/{$newLog->id}");
+        $response
+            ->assertRedirect('/behavior')
+            ->assertSessionHas('success', 'Đã ghi nhận hành vi.');
+
         $this->assertDatabaseHas('behavior_logs', [
             'child_id' => $child->id,
             'behavior_type' => 'tantrum',
@@ -224,6 +248,58 @@ class BehaviorControllerTest extends TestCase
             'trigger' => 'Asked to transition to math class',
             'note' => 'Child was tired',
         ]);
+    }
+
+    public function test_invalid_behavior_log_fails_validation(): void
+    {
+        $response = $this->from('/behavior/create')->post('/behavior', [
+            'child_id' => '',
+            'behavior_type' => '',
+            'recorded_at' => '',
+        ]);
+
+        $response->assertRedirect('/behavior/create');
+        $response->assertSessionHasErrors(['child_id', 'behavior_type', 'recorded_at']);
+        $this->assertDatabaseCount('behavior_logs', 0);
+    }
+
+    public function test_created_behavior_appears_on_behavior_page(): void
+    {
+        $child = Child::factory()->create(['status' => 'active']);
+        $log = BehaviorLog::factory()->create([
+            'child_id' => $child->id,
+            'behavior_type' => 'picky_eating',
+            'severity' => 'low',
+            'recorded_at' => now(),
+        ]);
+
+        $response = $this->get('/behavior');
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Behavior/Index')
+            ->has('behaviorLogs', 1)
+            ->where('behaviorLogs.0.id', $log->id)
+            ->where('behaviorLogs.0.behavior_type', 'picky_eating')
+            ->has('behaviorGroups', 1)
+            ->where('behaviorGroups.0.logs.0.id', $log->id)
+        );
+    }
+
+    public function test_behavior_type_displays_vietnamese_label(): void
+    {
+        $response = $this->get('/behavior/create');
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Behavior/Create')
+            ->where('behaviorTypes.tantrum', 'Ăn vạ')
+            ->where('behaviorTypes.avoidance', 'Né tránh')
+            ->where('behaviorTypes.difficulty_transitioning', 'Khó chuyển hoạt động')
+            ->where('severities.low', 'Nhẹ')
+            ->where('severities.medium', 'Trung bình')
+            ->where('severities.high', 'Cao')
+        );
     }
 
     /**

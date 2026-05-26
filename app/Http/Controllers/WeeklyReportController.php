@@ -22,8 +22,13 @@ class WeeklyReportController extends Controller
      */
     public function index(Request $request)
     {
+        $query = Child::notVoided();
+        if ($request->filled('child_id')) {
+            $query->orWhere('id', $request->input('child_id'));
+        }
+
         return Inertia::render('Reports/Weekly', [
-            'children' => Child::orderBy('full_name')->get(['id', 'full_name', 'status']),
+            'children' => $query->orderBy('full_name')->get(['id', 'full_name', 'status']),
             'filters' => $request->only(['child_id', 'start_date', 'end_date']),
         ]);
     }
@@ -45,8 +50,13 @@ class WeeklyReportController extends Controller
             $request->end_date
         );
 
+        $query = Child::notVoided();
+        if ($request->filled('child_id')) {
+            $query->orWhere('id', $request->input('child_id'));
+        }
+
         return Inertia::render('Reports/Weekly', [
-            'children' => Child::orderBy('full_name')->get(['id', 'full_name', 'status']),
+            'children' => $query->orderBy('full_name')->get(['id', 'full_name', 'status']),
             'reportData' => $reportData,
             'filters' => $request->only(['child_id', 'start_date', 'end_date']),
         ]);

@@ -26,6 +26,7 @@
         </Link>
         <div class="flex items-center gap-2 w-full sm:w-auto">
           <Link
+            v-if="child.status !== 'voided'"
             :href="`/children/${child.id}/edit`"
             class="flex-1 sm:flex-none text-center px-4 py-2 border border-slate-200 rounded-md text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >

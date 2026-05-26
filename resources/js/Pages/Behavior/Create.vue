@@ -1,7 +1,6 @@
 <template>
   <AppLayout>
     <div class="space-y-6">
-      <!-- Breadcrumbs / Back button -->
       <div>
         <Link
           :href="route('behavior.index')"
@@ -11,16 +10,14 @@
         </Link>
       </div>
 
-      <!-- Header -->
       <div>
-        <h1 class="text-3xl font-bold text-slate-900">Ghi nhận sự cố hành vi</h1>
-        <p class="mt-2 text-sm text-slate-500">
-          Ghi lại sự cố Tiền đề-Hành vi-Hệ quả để giúp theo dõi các mẫu hành vi của trẻ.
-          Tất cả các trường có <span class="text-rose-500">*</span> là bắt buộc.
+        <h1 class="text-3xl font-bold text-slate-900">Ghi nhận hành vi</h1>
+        <p class="mt-2 max-w-3xl text-sm text-slate-500">
+          Ghi lại thời điểm, nguyên nhân/kích hoạt và cách xử lý để phụ huynh hoặc chuyên viên theo dõi mẫu hành vi của bé.
+          Các trường có <span class="text-rose-500">*</span> là bắt buộc.
         </p>
       </div>
 
-      <!-- Form Component -->
       <BehaviorForm
         :children="children"
         :behavior-types="behaviorTypes"
@@ -31,9 +28,9 @@
 </template>
 
 <script setup>
+import { Link } from '@inertiajs/vue3';
 import AppLayout from '../../Components/layout/AppLayout.vue';
 import BehaviorForm from '../../Components/behavior/BehaviorForm.vue';
-import { Link } from '@inertiajs/vue3';
 
 defineProps({
   children: {

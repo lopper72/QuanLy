@@ -29,10 +29,18 @@ class TrainingController extends Controller
      */
     public function index(Request $request): Response
     {
-        $filters = $request->only(['child_id', 'status', 'date_from', 'date_to']);
+        $filters = $request->only(['child_id', 'status', 'date_from', 'date_to', 'child_status']);
         
         $sessions = $this->trainingService->listSessions($filters);
-        $children = Child::orderBy('full_name')->get();
+        
+        $query = Child::notVoided();
+        if ($request->filled('child_id')) {
+            $query->orWhere('id', $request->input('child_id'));
+        }
+        if ($request->input('child_status') === 'voided' || $request->input('child_status') === 'all') {
+            $query->orWhere('status', 'voided');
+        }
+        $children = $query->orderBy('full_name')->get();
         
         // Group sessions by child for the timeline view
         $grouped = $this->trainingService->groupSessionsByChild($sessions);
@@ -92,7 +100,10 @@ class TrainingController extends Controller
     public function edit(TrainingSession $trainingSession): Response
     {
         $session = $this->trainingService->getSessionDetail($trainingSession);
-        $children = Child::active()->orderBy('full_name')->get();
+        $children = Child::active()
+            ->orWhere('id', $session->child_id)
+            ->orderBy('full_name')
+            ->get();
         $exercises = Exercise::where('is_active', true)->orderBy('title')->get();
 
         return Inertia::render('Training/Edit', [

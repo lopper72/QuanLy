@@ -49,6 +49,19 @@
     </div>
 
     <div class="mt-6 flex flex-wrap items-center justify-end gap-2">
+      <Link
+        :href="`/children/${child.id}`"
+        class="inline-flex items-center px-3 py-1.5 border border-transparent rounded-md text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+      >
+        Xem hồ sơ &rarr;
+      </Link>
+      <Link
+        v-if="child.status !== 'voided'"
+        :href="`/children/${child.id}/edit`"
+        class="inline-flex items-center px-3 py-1.5 border border-slate-200 rounded-md text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+      >
+        Sửa
+      </Link>
       <button
         v-if="child.status === 'active'"
         type="button"
@@ -66,14 +79,6 @@
         Tiếp tục can thiệp
       </button>
       <button
-        v-if="child.status === 'voided' || child.status === 'stopped'"
-        type="button"
-        @click="deleteChild"
-        class="inline-flex items-center px-3 py-1.5 border border-red-200 rounded-md text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-      >
-        Xóa hồ sơ
-      </button>
-      <button
         v-if="child.status !== 'voided'"
         type="button"
         @click="voidChild"
@@ -81,18 +86,13 @@
       >
         Ngừng can thiệp
       </button>
-      <Link
-        :href="`/children/${child.id}/edit`"
-        class="inline-flex items-center px-3 py-1.5 border border-slate-200 rounded-md text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+      <button
+        type="button"
+        @click="deleteChild"
+        class="inline-flex items-center px-3 py-1.5 border border-red-200 rounded-md text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
       >
-        Sửa
-      </Link>
-      <Link
-        :href="`/children/${child.id}`"
-        class="inline-flex items-center px-3 py-1.5 border border-transparent rounded-md text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-      >
-        Xem hồ sơ &rarr;
-      </Link>
+        Xóa
+      </button>
     </div>
   </div>
 </template>
@@ -175,7 +175,7 @@ const voidChild = () => {
 };
 
 const deleteChild = () => {
-  if (!window.confirm(`Bạn có chắc muốn xóa hồ sơ trẻ này? Hồ sơ sẽ được ẩn khỏi danh sách, nhưng dữ liệu lịch sử vẫn được giữ lại.`)) {
+  if (!window.confirm('Bạn có chắc muốn xóa hồ sơ trẻ này không? Dữ liệu liên quan có thể bị ảnh hưởng.')) {
     return;
   }
 

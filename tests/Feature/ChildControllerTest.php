@@ -379,6 +379,37 @@ class ChildControllerTest extends TestCase
             );
     }
 
+    public function test_voided_children_are_excluded_from_listings_by_default(): void
+    {
+        // 1 active, 1 voided
+        $activeChild = Child::factory()->create(['status' => 'active']);
+        $voidedChild = Child::factory()->create(['status' => 'voided', 'voided_at' => now()]);
+
+        $response = $this->get('/children');
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Children/Index')
+            ->has('children', 1)
+            ->where('children.0.id', $activeChild->id)
+        );
+    }
+
+    public function test_voided_children_are_included_only_when_filtered_by_voided_status(): void
+    {
+        $activeChild = Child::factory()->create(['status' => 'active']);
+        $voidedChild = Child::factory()->create(['status' => 'voided', 'voided_at' => now()]);
+
+        $response = $this->get('/children?status=voided');
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Children/Index')
+            ->has('children', 1)
+            ->where('children.0.id', $voidedChild->id)
+        );
+    }
+
     public function test_active_child_cannot_be_deleted(): void
     {
         $child = Child::factory()->create(['status' => 'active']);
@@ -478,5 +509,20 @@ class ChildControllerTest extends TestCase
         $this->assertSoftDeleted('children', ['id' => $child->id]);
         $this->assertDatabaseHas('training_sessions', ['id' => $trainingSession->id]);
         $this->assertDatabaseHas('assessments', ['id' => $assessment->id]);
+    }
+
+    public function test_guest_cannot_delete_child(): void
+    {
+        auth()->logout();
+
+        $child = Child::factory()->create([
+            'status' => 'voided',
+            'voided_at' => now(),
+        ]);
+
+        $response = $this->delete("/children/{$child->id}");
+
+        $response->assertRedirect(route('login'));
+        $this->assertDatabaseHas('children', ['id' => $child->id, 'deleted_at' => null]);
     }
 }

@@ -26,7 +26,12 @@ class AssessmentController extends Controller
 
         $assessments = $this->assessmentService->listAssessments($filters);
         $summary = $this->assessmentService->getAssessmentSummary($filters);
-        $children = Child::orderBy('full_name')->get(['id', 'full_name', 'status']);
+        
+        $query = Child::notVoided();
+        if (!empty($filters['child_id'])) {
+            $query->orWhere('id', $filters['child_id']);
+        }
+        $children = $query->orderBy('full_name')->get(['id', 'full_name', 'status']);
 
         return Inertia::render('Assessment/Index', [
             'assessments' => $assessments,
@@ -46,7 +51,12 @@ class AssessmentController extends Controller
         $latestSkillLevels = $this->assessmentService->getLatestSkillLevels(
             $filters['child_id'] ?? null
         );
-        $children = Child::orderBy('full_name')->get(['id', 'full_name', 'status']);
+        
+        $query = Child::notVoided();
+        if (!empty($filters['child_id'])) {
+            $query->orWhere('id', $filters['child_id']);
+        }
+        $children = $query->orderBy('full_name')->get(['id', 'full_name', 'status']);
 
         return Inertia::render('Assessment/Progress', [
             'progressData' => $progressData,
@@ -102,7 +112,10 @@ class AssessmentController extends Controller
     public function edit(Assessment $assessment): Response
     {
         $detail = $this->assessmentService->getAssessmentDetail($assessment);
-        $children = Child::active()->orderBy('full_name')->get(['id', 'full_name', 'status']);
+        $children = Child::active()
+            ->orWhere('id', $assessment->child_id)
+            ->orderBy('full_name')
+            ->get(['id', 'full_name', 'status']);
 
         return Inertia::render('Assessment/Edit', [
             'assessment' => $detail,
