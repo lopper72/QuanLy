@@ -3,7 +3,14 @@
 use App\Models\ChecklistItem;
 use App\Models\DailyChecklist;
 use App\Models\Exercise;
+use App\Models\MealPlanItem;
+use App\Models\MealPlanTemplate;
 use App\Models\Reminder;
+use App\Models\SchedulerRun;
+use App\Models\SupplementSchedule;
+use App\Models\TelegramSetting;
+use App\Models\TrainingSession;
+use App\Models\TrainingSessionItem;
 use App\Models\User;
 use App\Services\TelegramCommandService;
 use App\Services\TelegramMealSuggestionService;
@@ -249,12 +256,18 @@ Artisan::command('telegram:commands:set', function (TelegramService $telegramSer
 Schedule::command('telegram:send-reminders')->everyMinute();
 
 Artisan::command('telegram:send-due-reminders', function (TelegramReminderService $reminderService) {
-    $result = $reminderService->sendDueReminders();
+    try {
+        $result = $reminderService->sendDueReminders();
+    } catch (Throwable $exception) {
+        recordSchedulerRun('telegram:send-due-reminders', 'failed', null, $exception->getMessage());
+        throw $exception;
+    }
 
     $this->info("Tìm thấy {$result['pending']} nhắc lịch đến hạn.");
     $this->line("Đã gửi: {$result['sent']}");
     $this->line("Thất bại: {$result['failed']}");
     $this->line("Bỏ qua: {$result['skipped']}");
+    recordSchedulerRun('telegram:send-due-reminders', $result['failed'] > 0 ? 'failed' : 'success', json_encode($result, JSON_UNESCAPED_UNICODE));
 
     return $result['failed'] > 0 ? 1 : 0;
 })->purpose('Gửi các nhắc lịch Telegram đến hạn trước 30 phút');
@@ -262,17 +275,104 @@ Artisan::command('telegram:send-due-reminders', function (TelegramReminderServic
 Schedule::command('telegram:send-due-reminders')->everyMinute();
 
 Artisan::command('telegram:send-dinner-suggestions', function (TelegramMealSuggestionService $mealSuggestionService) {
-    $result = $mealSuggestionService->sendDailyDinnerSuggestions();
+    try {
+        $result = $mealSuggestionService->sendDailyDinnerSuggestions();
+    } catch (Throwable $exception) {
+        recordSchedulerRun('telegram:send-dinner-suggestions', 'failed', null, $exception->getMessage());
+        throw $exception;
+    }
 
     $this->info("Đã kiểm tra {$result['children']} trẻ đang can thiệp.");
     $this->line("Đã gửi: {$result['sent']}");
     $this->line("Bỏ qua: {$result['skipped']}");
     $this->line("Thất bại: {$result['failed']}");
+    recordSchedulerRun('telegram:send-dinner-suggestions', $result['failed'] > 0 ? 'failed' : 'success', json_encode($result, JSON_UNESCAPED_UNICODE));
 
     return $result['failed'] > 0 ? 1 : 0;
 })->purpose('Gửi gợi ý bữa tối qua Telegram lúc 14:00');
 
-Schedule::command('telegram:send-dinner-suggestions')->dailyAt('14:00');
+Schedule::command('telegram:send-dinner-suggestions')
+    ->timezone('Asia/Ho_Chi_Minh')
+    ->dailyAt('14:00');
+
+Artisan::command('telegram:demo-today', function (TelegramReminderService $reminderService) {
+    $child = \App\Models\Child::active()->orderBy('id')->first();
+    $chatId = TelegramSetting::current()->default_chat_id
+        ?: User::query()->whereNotNull('telegram_chat_id')->where('telegram_notifications_enabled', true)->value('telegram_chat_id');
+
+    if (!$child || blank($chatId)) {
+        $message = 'Chưa có trẻ đang can thiệp hoặc mã hội thoại Telegram để tạo dữ liệu demo.';
+        $this->error($message);
+        recordSchedulerRun('telegram:demo-today', 'failed', null, $message);
+
+        return 1;
+    }
+
+    $exercise = Exercise::firstOrCreate(
+        ['slug' => 'demo-telegram-van-dong-nhe'],
+        [
+            'title' => 'Vận động nhẹ demo',
+            'category' => 'gross_motor',
+            'difficulty' => 'easy',
+            'instructions' => 'Tập nhẹ theo hướng dẫn của phụ huynh.',
+            'description' => 'Bài tập demo để kiểm tra nhắc lịch Telegram.',
+            'estimated_minutes' => 10,
+            'is_active' => true,
+        ]
+    );
+
+    $time = now()->addMinutes(30)->format('H:i');
+    $session = TrainingSession::firstOrCreate(
+        ['child_id' => $child->id, 'session_date' => today()->toDateString(), 'scheduled_time' => $time],
+        ['status' => 'pending', 'total_minutes' => 10, 'notes' => 'Dữ liệu demo Telegram']
+    );
+    TrainingSessionItem::firstOrCreate(
+        ['training_session_id' => $session->id, 'exercise_id' => $exercise->id],
+        ['sort_order' => 1, 'duration_minutes' => 10, 'completion_status' => 'pending']
+    );
+
+    $supplement = SupplementSchedule::firstOrCreate(
+        ['child_id' => $child->id, 'name' => 'DHA demo'],
+        [
+            'type' => 'supplement',
+            'dosage_note' => 'Theo hướng dẫn của bác sĩ hoặc nhãn sản phẩm.',
+            'timing_type' => 'fixed_time',
+            'scheduled_time' => $time,
+            'frequency' => 'daily',
+            'status' => 'active',
+        ]
+    );
+
+    $template = MealPlanTemplate::firstOrCreate(
+        ['title' => 'Demo lịch ăn Telegram'],
+        [
+            'goal' => 'constipation_support',
+            'description' => 'Dữ liệu demo để kiểm tra nhắc lịch ăn uống.',
+            'week_number' => 1,
+            'is_active' => true,
+        ]
+    );
+    $meal = MealPlanItem::firstOrCreate(
+        ['meal_plan_template_id' => $template->id, 'day_of_week' => today()->dayOfWeekIso, 'meal_time' => 'dinner'],
+        [
+            'scheduled_time' => $time,
+            'title' => 'Bữa tối demo',
+            'foods_json' => ['Cơm mềm', 'Canh bí đỏ', 'Cá hấp', 'Thanh long chín'],
+            'constipation_support_note' => 'Có thể hỗ trợ tiêu hóa nếu phù hợp với bé.',
+            'parent_tip' => 'Cho bé thử từng lượng nhỏ.',
+        ]
+    );
+
+    $reminderService->createTrainingReminder($session->refresh());
+    $reminderService->createSupplementReminder($supplement->refresh());
+    $reminderService->createMealReminder($meal->refresh());
+
+    $summary = "Đã chuẩn bị dữ liệu demo cho {$child->full_name}, giờ nhắc {$time}.";
+    $this->info($summary);
+    recordSchedulerRun('telegram:demo-today', 'success', $summary);
+
+    return 0;
+})->purpose('Tạo dữ liệu demo hôm nay để kiểm tra Telegram scheduler');
 
 Artisan::command('training:close-missed', function (TrainingService $trainingService) {
     $count = $trainingService->closeMissedSessions();
@@ -327,5 +427,18 @@ if (!function_exists('exercisePlaceholderSvg')) {
   <text x="400" y="542" text-anchor="middle" fill="#64748b" font-family="Arial, sans-serif" font-size="20">{$safeCategory}</text>
 </svg>
 SVG;
+    }
+}
+
+if (!function_exists('recordSchedulerRun')) {
+    function recordSchedulerRun(string $command, string $status, ?string $summary = null, ?string $error = null): void
+    {
+        SchedulerRun::create([
+            'command' => $command,
+            'ran_at' => now(),
+            'status' => $status,
+            'output_summary' => $summary,
+            'error_message' => $error,
+        ]);
     }
 }

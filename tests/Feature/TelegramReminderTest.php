@@ -6,6 +6,7 @@ use App\Models\Child;
 use App\Models\MealPlanItem;
 use App\Models\MealPlanTemplate;
 use App\Models\SupplementSchedule;
+use App\Models\TelegramMessage;
 use App\Models\TelegramReminderLog;
 use App\Models\TelegramSetting;
 use App\Models\TrainingSession;
@@ -69,9 +70,10 @@ class TelegramReminderTest extends TestCase
             'related_id' => $session->id,
             'status' => 'sent',
         ]);
+        $this->assertStringContainsString('Còn 30 phút', TelegramMessage::where('message_type', 'reminder_training')->first()->message_text);
     }
 
-    public function test_meal_reminder_due_30_minutes_before_is_created_and_sent(): void
+    public function test_meal_items_are_not_sent_by_30_minute_reminder_service(): void
     {
         $this->fakeTelegram();
         Child::factory()->create(['status' => 'active']);
@@ -79,11 +81,10 @@ class TelegramReminderTest extends TestCase
 
         $result = app(TelegramReminderService::class)->sendDueReminders();
 
-        $this->assertSame(1, $result['sent']);
-        $this->assertDatabaseHas('telegram_reminder_logs', [
+        $this->assertSame(0, $result['sent']);
+        $this->assertDatabaseMissing('telegram_reminder_logs', [
             'reminder_type' => 'meal',
             'related_id' => $item->id,
-            'status' => 'sent',
         ]);
     }
 

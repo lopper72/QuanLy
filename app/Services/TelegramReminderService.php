@@ -34,13 +34,6 @@ class TelegramReminderService
             ->get()
             ->each(fn (TrainingSession $session) => $logs->push($this->createTrainingReminder($session)));
 
-        MealPlanItem::with('template')
-            ->where('day_of_week', today()->dayOfWeekIso)
-            ->whereNotNull('scheduled_time')
-            ->whereHas('template', fn ($query) => $query->active())
-            ->get()
-            ->each(fn (MealPlanItem $item) => $logs->push($this->createMealReminder($item)));
-
         SupplementSchedule::with('child')
             ->active()
             ->whereNotNull('scheduled_time')
@@ -247,9 +240,7 @@ class TelegramReminderService
                     ->latest('id')
                     ->firstOrFail()
             ),
-            TelegramReminderLog::TYPE_MEAL => $this->createMealReminder(
-                MealPlanItem::whereNotNull('scheduled_time')->latest('id')->firstOrFail()
-            ),
+            TelegramReminderLog::TYPE_MEAL => throw new InvalidArgumentException('Lịch ăn dùng gợi ý bữa tối lúc 14:00, không dùng nhắc trước 30 phút.'),
             TelegramReminderLog::TYPE_SUPPLEMENT => $this->createSupplementReminder(
                 SupplementSchedule::active()->whereNotNull('scheduled_time')->latest('id')->firstOrFail()
             ),
@@ -329,7 +320,7 @@ class TelegramReminderService
 
         $time = substr((string) $item->scheduled_time, 0, 5);
         $childName = $log->child?->full_name ?: 'bé';
-        $text = "Nhắc lịch ăn uống\n\nCòn 30 phút nữa đến lịch ăn của bé {$childName}.\n\nGiờ ăn: {$time}\nBữa: {$item->title}\nMục tiêu: hỗ trợ tiêu hóa và thói quen ăn uống";
+        $text = "Gợi ý bữa tối\n\nĐây là gợi ý chuẩn bị bữa tối cho bé {$childName}.\n\nGiờ ăn dự kiến: {$time}\nBữa: {$item->title}\nMục tiêu: hỗ trợ tiêu hóa và thói quen ăn uống";
 
         return [
             'text' => $text,

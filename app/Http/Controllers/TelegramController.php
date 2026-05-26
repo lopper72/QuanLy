@@ -8,9 +8,13 @@ use App\Models\TelegramMealSuggestionLog;
 use App\Models\TelegramReminderLog;
 use App\Models\TelegramSetting;
 use App\Models\Child;
+use App\Models\Exercise;
 use App\Models\MealPlanItem;
+use App\Models\MealPlanTemplate;
+use App\Models\SchedulerRun;
 use App\Models\SupplementSchedule;
 use App\Models\TrainingSession;
+use App\Models\TrainingSessionItem;
 use App\Services\TelegramService;
 use App\Services\TelegramMealSuggestionService;
 use App\Services\TelegramReminderService;
@@ -18,6 +22,8 @@ use App\Services\TelegramTrainingNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -36,6 +42,7 @@ class TelegramController extends Controller
             'stats' => $this->statsPayload(),
             'trainingTest' => $this->trainingTestPayload(),
             'systemStatus' => $this->systemStatusPayload(),
+            'schedulerDiagnostics' => $this->schedulerDiagnosticsPayload(),
             'reminderTest' => $this->reminderTestPayload(),
             'mealSuggestionTest' => $this->mealSuggestionTestPayload(),
         ]);
@@ -180,9 +187,9 @@ class TelegramController extends Controller
         return $this->sendTestReminder($service, TelegramReminderLog::TYPE_TRAINING);
     }
 
-    public function testReminderMeal(TelegramReminderService $service): RedirectResponse
+    public function testReminderMeal(Request $request, TelegramMealSuggestionService $service): RedirectResponse
     {
-        return $this->sendTestReminder($service, TelegramReminderLog::TYPE_MEAL);
+        return $this->testDinnerSuggestion($request, $service);
     }
 
     public function testReminderSupplement(TelegramReminderService $service): RedirectResponse
@@ -273,6 +280,122 @@ class TelegramController extends Controller
         ]);
 
         return back()->with('success', 'Đã giả lập phản hồi gợi ý bữa tối.');
+    }
+
+    public function createTodayDemoData(TelegramReminderService $service): RedirectResponse
+    {
+        $child = Child::active()->orderBy('id')->first();
+        $chatId = TelegramSetting::current()->default_chat_id
+            ?: \App\Models\User::query()->whereNotNull('telegram_chat_id')->where('telegram_notifications_enabled', true)->value('telegram_chat_id');
+
+        if (!$child || blank($chatId)) {
+            return back()->with('error', 'Chưa có mã hội thoại Telegram. Vui lòng liên kết Telegram hoặc nhập chat_id để test.');
+        }
+
+        $time = now()->addMinutes(30)->format('H:i');
+        $exercise = Exercise::firstOrCreate(
+            ['slug' => 'demo-telegram-van-dong-nhe'],
+            [
+                'title' => 'Vận động nhẹ demo',
+                'category' => 'gross_motor',
+                'difficulty' => 'easy',
+                'instructions' => 'Tập nhẹ theo hướng dẫn của phụ huynh.',
+                'description' => 'Bài tập demo để kiểm tra nhắc lịch Telegram.',
+                'estimated_minutes' => 10,
+                'is_active' => true,
+            ]
+        );
+
+        $session = TrainingSession::firstOrCreate(
+            ['child_id' => $child->id, 'session_date' => today()->toDateString(), 'scheduled_time' => $time],
+            ['status' => 'pending', 'total_minutes' => 10, 'notes' => 'Dữ liệu demo Telegram']
+        );
+        TrainingSessionItem::firstOrCreate(
+            ['training_session_id' => $session->id, 'exercise_id' => $exercise->id],
+            ['sort_order' => 1, 'duration_minutes' => 10, 'completion_status' => 'pending']
+        );
+
+        $supplement = SupplementSchedule::firstOrCreate(
+            ['child_id' => $child->id, 'name' => 'DHA demo'],
+            [
+                'type' => 'supplement',
+                'dosage_note' => 'Theo hướng dẫn của bác sĩ hoặc nhãn sản phẩm.',
+                'timing_type' => 'fixed_time',
+                'scheduled_time' => $time,
+                'frequency' => 'daily',
+                'status' => 'active',
+            ]
+        );
+
+        $template = MealPlanTemplate::firstOrCreate(
+            ['title' => 'Demo lịch ăn Telegram'],
+            [
+                'goal' => 'constipation_support',
+                'description' => 'Dữ liệu demo để kiểm tra nhắc lịch ăn uống.',
+                'week_number' => 1,
+                'is_active' => true,
+            ]
+        );
+        $meal = MealPlanItem::firstOrCreate(
+            ['meal_plan_template_id' => $template->id, 'day_of_week' => today()->dayOfWeekIso, 'meal_time' => 'dinner'],
+            [
+                'scheduled_time' => $time,
+                'title' => 'Bữa tối demo',
+                'foods_json' => ['Cơm mềm', 'Canh bí đỏ', 'Cá hấp', 'Thanh long chín'],
+                'constipation_support_note' => 'Có thể hỗ trợ tiêu hóa nếu phù hợp với bé.',
+                'parent_tip' => 'Cho bé thử từng lượng nhỏ.',
+            ]
+        );
+
+        $service->createTrainingReminder($session->refresh());
+        $service->createSupplementReminder($supplement->refresh());
+        $service->createMealReminder($meal->refresh());
+
+        return back()->with('success', "Đã tạo dữ liệu demo cho hôm nay. Các lịch demo được đặt lúc {$time} để nhắc ngay.");
+    }
+
+    public function sendDinnerNow(Request $request, TelegramMealSuggestionService $service): RedirectResponse
+    {
+        return $this->testDinnerSuggestion($request, $service);
+    }
+
+    public function sendTrainingReminderNow(TelegramReminderService $service): RedirectResponse
+    {
+        return $this->sendTestReminder($service, TelegramReminderLog::TYPE_TRAINING);
+    }
+
+    public function sendMealReminderNow(Request $request, TelegramMealSuggestionService $service): RedirectResponse
+    {
+        return $this->testDinnerSuggestion($request, $service);
+    }
+
+    public function sendSupplementReminderNow(TelegramReminderService $service): RedirectResponse
+    {
+        return $this->sendTestReminder($service, TelegramReminderLog::TYPE_SUPPLEMENT);
+    }
+
+    public function simulateAnCommand(Request $request, TelegramMealSuggestionService $service): RedirectResponse
+    {
+        return $this->testMealCommandAn($request, $service);
+    }
+
+    public function simulateDoimonCommand(Request $request, TelegramMealSuggestionService $service): RedirectResponse
+    {
+        return $this->testMealCommandDoimon($request, $service);
+    }
+
+    public function runDinnerCommand(): RedirectResponse
+    {
+        $exitCode = Artisan::call('telegram:send-dinner-suggestions');
+
+        return back()->with($exitCode === 0 ? 'success' : 'error', trim(Artisan::output()) ?: 'Đã chạy thử lệnh gợi ý bữa tối.');
+    }
+
+    public function runReminderCommand(): RedirectResponse
+    {
+        $exitCode = Artisan::call('telegram:send-due-reminders');
+
+        return back()->with($exitCode === 0 ? 'success' : 'error', trim(Artisan::output()) ?: 'Đã chạy thử lệnh nhắc lịch.');
     }
 
     private function sendTestReminder(TelegramReminderService $service, string $type): RedirectResponse
@@ -460,6 +583,52 @@ class TelegramController extends Controller
             'bot_reachable' => $info !== null || filled($settings->bot_token) || filled(config('services.telegram.bot_token')),
             'last_inbound_at' => optional($lastInbound?->received_at)->toIso8601String(),
             'last_outbound_at' => optional($lastOutbound?->sent_at)->toIso8601String(),
+        ];
+    }
+
+    private function schedulerDiagnosticsPayload(): array
+    {
+        $lastReminder = TelegramReminderLog::query()->latest('sent_at')->latest('created_at')->first();
+        $lastDinnerRun = SchedulerRun::query()->where('command', 'telegram:send-dinner-suggestions')->latest('ran_at')->first();
+        $lastReminderRun = SchedulerRun::query()->where('command', 'telegram:send-due-reminders')->latest('ran_at')->first();
+        $lastAnyRun = SchedulerRun::query()->latest('ran_at')->first();
+        $settings = TelegramSetting::current();
+
+        return [
+            'app_url' => config('app.url'),
+            'server_time' => now()->toIso8601String(),
+            'app_timezone' => config('app.timezone'),
+            'vietnam_time' => Carbon::now('Asia/Ho_Chi_Minh')->toIso8601String(),
+            'bot_configured' => filled($settings->bot_token) || filled(config('services.telegram.bot_token')),
+            'webhook_url' => $settings->webhook_url ?: config('services.telegram.webhook_url'),
+            'scheduler_last_run_at' => optional($lastAnyRun?->ran_at)->toIso8601String(),
+            'last_dinner_run' => $lastDinnerRun ? [
+                'ran_at' => optional($lastDinnerRun->ran_at)->toIso8601String(),
+                'status' => $lastDinnerRun->status,
+                'summary' => $lastDinnerRun->output_summary,
+                'error' => $lastDinnerRun->error_message,
+            ] : null,
+            'last_reminder_run' => $lastReminderRun ? [
+                'ran_at' => optional($lastReminderRun->ran_at)->toIso8601String(),
+                'status' => $lastReminderRun->status,
+                'summary' => $lastReminderRun->output_summary,
+                'error' => $lastReminderRun->error_message,
+            ] : null,
+            'last_reminder_sent_at' => optional($lastReminder?->sent_at)->toIso8601String(),
+            'queue_connection' => config('queue.default'),
+            'cron_hint' => '* * * * * cd /path/to/project && php artisan schedule:run >> /dev/null 2>&1',
+            'recent_runs' => SchedulerRun::query()
+                ->latest('ran_at')
+                ->limit(8)
+                ->get()
+                ->map(fn (SchedulerRun $run) => [
+                    'id' => $run->id,
+                    'command' => $run->command,
+                    'ran_at' => optional($run->ran_at)->toIso8601String(),
+                    'status' => $run->status,
+                    'summary' => $run->output_summary,
+                    'error' => $run->error_message,
+                ]),
         ];
     }
 

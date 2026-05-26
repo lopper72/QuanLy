@@ -13,6 +13,133 @@
         </Link>
       </header>
 
+      <section class="rounded-lg bg-white p-4 ring-1 ring-gray-200">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Kiểm tra lịch tự động</h2>
+            <p class="mt-1 text-sm text-gray-600">Dùng khu vực này để test nhắc lịch Telegram ngay, không cần chờ đúng giờ thật.</p>
+          </div>
+          <div class="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Cron production cần: <span class="font-mono">{{ schedulerDiagnostics.cron_hint }}</span>
+          </div>
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <div class="rounded-md border border-gray-200 p-4">
+            <h3 class="text-sm font-semibold text-gray-900">Trạng thái hệ thống</h3>
+            <dl class="mt-3 space-y-2 text-sm">
+              <div class="flex justify-between gap-3">
+                <dt class="text-gray-500">APP_URL</dt>
+                <dd class="truncate font-medium text-gray-900">{{ schedulerDiagnostics.app_url }}</dd>
+              </div>
+              <div class="flex justify-between gap-3">
+                <dt class="text-gray-500">Giờ server</dt>
+                <dd class="font-medium text-gray-900">{{ formatDateTime(schedulerDiagnostics.server_time) }}</dd>
+              </div>
+              <div class="flex justify-between gap-3">
+                <dt class="text-gray-500">Timezone app</dt>
+                <dd class="font-medium text-gray-900">{{ schedulerDiagnostics.app_timezone }}</dd>
+              </div>
+              <div class="flex justify-between gap-3">
+                <dt class="text-gray-500">Giờ Việt Nam</dt>
+                <dd class="font-medium text-gray-900">{{ formatDateTime(schedulerDiagnostics.vietnam_time) }}</dd>
+              </div>
+              <div class="flex justify-between gap-3">
+                <dt class="text-gray-500">Bot Telegram</dt>
+                <dd class="font-medium" :class="schedulerDiagnostics.bot_configured ? 'text-emerald-700' : 'text-red-700'">
+                  {{ schedulerDiagnostics.bot_configured ? 'Đã cấu hình' : 'Chưa cấu hình' }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-gray-500">Webhook URL</dt>
+                <dd class="mt-1 break-all font-medium text-gray-900">{{ schedulerDiagnostics.webhook_url || 'Chưa có webhook URL' }}</dd>
+              </div>
+              <div class="flex justify-between gap-3">
+                <dt class="text-gray-500">Queue</dt>
+                <dd class="font-medium text-gray-900">{{ schedulerDiagnostics.queue_connection }}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="rounded-md border border-gray-200 p-4">
+            <h3 class="text-sm font-semibold text-gray-900">Test gửi ngay</h3>
+            <select v-model="schedulerForm.child_id" class="mt-3 w-full rounded-md border-gray-300 text-sm shadow-sm">
+              <option value="">Chọn bé để test</option>
+              <option v-for="child in mealSuggestionTest.children" :key="child.id" :value="child.id">{{ child.full_name }}</option>
+            </select>
+            <div class="mt-3 grid grid-cols-1 gap-2">
+              <button type="button" class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700" @click="postSchedulerWithChild('telegram.test.sendDinnerNow')">
+                Gửi gợi ý bữa tối ngay
+              </button>
+              <button type="button" class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="post('telegram.test.sendTrainingReminderNow')">
+                Gửi nhắc lịch tập ngay
+              </button>
+              <button type="button" class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="postSchedulerWithChild('telegram.test.sendMealReminderNow')">
+                Gửi gợi ý bữa tối ngay
+              </button>
+              <button type="button" class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="post('telegram.test.sendSupplementReminderNow')">
+                Gửi nhắc lịch bổ sung ngay
+              </button>
+              <button type="button" class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="post('telegram.demo.createTodayData')">
+                Tạo dữ liệu demo cho hôm nay
+              </button>
+            </div>
+          </div>
+
+          <div class="rounded-md border border-gray-200 p-4">
+            <h3 class="text-sm font-semibold text-gray-900">Test lệnh và schedule engine</h3>
+            <div class="mt-3 grid grid-cols-1 gap-2">
+              <button type="button" class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="postSchedulerWithChild('telegram.test.simulateAnCommand')">
+                Giả lập /an
+              </button>
+              <button type="button" class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="postSchedulerWithChild('telegram.test.simulateDoimonCommand')">
+                Giả lập /doimon
+              </button>
+              <button type="button" class="rounded-md bg-slate-800 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700" @click="post('telegram.test.runDinnerCommand')">
+                Chạy thử telegram:send-dinner-suggestions
+              </button>
+              <button type="button" class="rounded-md bg-slate-800 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700" @click="post('telegram.test.runReminderCommand')">
+                Chạy thử telegram:send-due-reminders
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div class="rounded-md bg-gray-50 p-4">
+            <h3 class="text-sm font-semibold text-gray-900">Kết quả scheduler gần đây</h3>
+            <div class="mt-3 space-y-2">
+              <div v-for="run in schedulerDiagnostics.recent_runs" :key="run.id" class="rounded-md bg-white p-3 text-sm ring-1 ring-gray-200">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="font-medium text-gray-900">{{ run.command }}</span>
+                  <span class="rounded-full px-2 py-0.5 text-xs font-medium" :class="run.status === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'">
+                    {{ run.status === 'success' ? 'Thành công' : 'Thất bại' }}
+                  </span>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">{{ formatDateTime(run.ran_at) }}</p>
+                <p v-if="run.summary" class="mt-1 line-clamp-2 text-xs text-gray-600">{{ run.summary }}</p>
+                <p v-if="run.error" class="mt-1 text-xs text-red-600">{{ run.error }}</p>
+              </div>
+              <p v-if="schedulerDiagnostics.recent_runs.length === 0" class="text-sm text-gray-500">Chưa có log scheduler. Nếu cron đã chạy, bảng này sẽ có dữ liệu.</p>
+            </div>
+          </div>
+
+          <div class="rounded-md bg-gray-50 p-4">
+            <h3 class="text-sm font-semibold text-gray-900">Checklist nguyên nhân thường gặp</h3>
+            <ul class="mt-3 space-y-2 text-sm text-gray-700">
+              <li>Cron Laravel scheduler đã cấu hình chưa?</li>
+              <li>Bot token có chưa?</li>
+              <li>Chat ID đã liên kết chưa?</li>
+              <li>Trẻ còn đang can thiệp không?</li>
+              <li>Lịch hôm nay có dữ liệu không?</li>
+              <li>Đã gửi rồi nên bị chặn trùng không?</li>
+              <li>Server timezone có đúng với giờ mong muốn không?</li>
+              <li>Queue worker có chạy không nếu không dùng queue sync?</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
       <section class="grid grid-cols-1 gap-4 xl:grid-cols-5">
         <div class="rounded-lg bg-white p-4 ring-1 ring-gray-200 xl:col-span-2">
           <h2 class="text-base font-semibold text-gray-900">Kiểm tra cấu hình</h2>
@@ -65,13 +192,13 @@
 
         <div class="rounded-lg bg-white p-4 ring-1 ring-gray-200">
           <h2 class="text-base font-semibold text-gray-900">Test nhắc lịch</h2>
-          <p class="mt-1 text-sm text-gray-500">Gửi thử tin nhắc trước 30 phút cho từng loại lịch.</p>
+          <p class="mt-1 text-sm text-gray-500">Gửi thử tin nhắc lịch tập/bổ sung và gợi ý chuẩn bị bữa tối.</p>
           <div class="mt-4 space-y-2">
             <button type="button" class="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700" @click="post('telegram.test.reminder.training')">
               Test nhắc lịch tập trước 30 phút
             </button>
-            <button type="button" class="w-full rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700" @click="post('telegram.test.reminder.meal')">
-              Test nhắc lịch ăn trước 30 phút
+            <button type="button" class="w-full rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700" @click="postMealSuggestion('telegram.test.reminder.meal')">
+              Test gợi ý bữa tối lúc 14:00
             </button>
             <button type="button" class="w-full rounded-md bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700" @click="post('telegram.test.reminder.supplement')">
               Test nhắc lịch uống/bổ sung trước 30 phút
@@ -167,6 +294,7 @@ const props = defineProps({
   stats: { type: Object, required: true },
   trainingTest: { type: Object, required: true },
   systemStatus: { type: Object, required: true },
+  schedulerDiagnostics: { type: Object, required: true },
   reminderTest: { type: Object, required: true },
   mealSuggestionTest: { type: Object, required: true },
 });
@@ -176,6 +304,9 @@ const mealSuggestionForm = useForm({
   child_id: props.mealSuggestionTest.children?.[0]?.id || '',
   action: 'change',
 });
+const schedulerForm = useForm({
+  child_id: props.mealSuggestionTest.children?.[0]?.id || '',
+});
 const mealSuggestionActions = [
   { value: 'change', label: 'Giả lập bấm Đổi món khác' },
   { value: 'view', label: 'Giả lập bấm Xem lịch hôm nay' },
@@ -184,6 +315,10 @@ const mealSuggestionActions = [
 
 function post(routeName) {
   router.post(route(routeName), {}, { preserveScroll: true });
+}
+
+function postSchedulerWithChild(routeName) {
+  schedulerForm.post(route(routeName), { preserveScroll: true });
 }
 
 function postMealSuggestion(routeName) {
@@ -198,7 +333,7 @@ function postMealCallback(action) {
 function reminderTypeLabel(type) {
   return {
     training: 'Nhắc lịch tập',
-    meal: 'Nhắc lịch ăn',
+    meal: 'Gợi ý bữa tối',
     supplement: 'Nhắc lịch bổ sung',
   }[type] || 'Nhắc lịch';
 }
@@ -220,5 +355,16 @@ function statusClass(status) {
     skipped: 'bg-gray-100 text-gray-700',
     pending: 'bg-amber-50 text-amber-700',
   }[status] || 'bg-gray-100 text-gray-700';
+}
+
+function formatDateTime(value) {
+  if (!value) return 'Chưa có dữ liệu';
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
 }
 </script>

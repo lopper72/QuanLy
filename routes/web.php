@@ -179,6 +179,15 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/test/meal-suggestion/an', [TelegramController::class, 'testMealCommandAn'])->name('test.mealSuggestion.an');
         Route::post('/test/meal-suggestion/doimon', [TelegramController::class, 'testMealCommandDoimon'])->name('test.mealSuggestion.doimon');
         Route::post('/test/meal-suggestion/callback', [TelegramController::class, 'testMealSuggestionCallback'])->name('test.mealSuggestion.callback');
+        Route::post('/test/send-dinner-now', [TelegramController::class, 'sendDinnerNow'])->name('test.sendDinnerNow');
+        Route::post('/test/send-training-reminder-now', [TelegramController::class, 'sendTrainingReminderNow'])->name('test.sendTrainingReminderNow');
+        Route::post('/test/send-meal-reminder-now', [TelegramController::class, 'sendMealReminderNow'])->name('test.sendMealReminderNow');
+        Route::post('/test/send-supplement-reminder-now', [TelegramController::class, 'sendSupplementReminderNow'])->name('test.sendSupplementReminderNow');
+        Route::post('/test/simulate-an-command', [TelegramController::class, 'simulateAnCommand'])->name('test.simulateAnCommand');
+        Route::post('/test/simulate-doimon-command', [TelegramController::class, 'simulateDoimonCommand'])->name('test.simulateDoimonCommand');
+        Route::post('/test/run-dinner-command', [TelegramController::class, 'runDinnerCommand'])->name('test.runDinnerCommand');
+        Route::post('/test/run-reminder-command', [TelegramController::class, 'runReminderCommand'])->name('test.runReminderCommand');
+        Route::post('/demo/create-today-data', [TelegramController::class, 'createTodayDemoData'])->name('demo.createTodayData');
         Route::post('/test/callback/simulate', [TelegramController::class, 'simulateCallback'])->name('test.callback.simulate');
         Route::get('/webhook-info', [TelegramController::class, 'webhookInfo'])->name('webhookInfo');
         Route::get('/messages', [TelegramController::class, 'messages'])->name('messages');

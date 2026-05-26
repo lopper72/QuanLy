@@ -138,8 +138,9 @@ Log không chứa bot token hoặc webhook secret.
 Hệ thống có lệnh gửi nhắc lịch Telegram trước 30 phút cho:
 
 - Lịch tập
-- Lịch ăn uống
 - Lịch bổ sung
+
+Lịch ăn uống dùng luồng riêng: gợi ý chuẩn bị bữa tối lúc 14:00, không phải nhắc trước 30 phút.
 
 Lệnh chạy thủ công:
 
@@ -164,7 +165,7 @@ php artisan queue:work --tries=3
 - Không gửi nhắc lịch: kiểm tra `TELEGRAM_BOT_TOKEN`, `default_chat_id`, trạng thái bé và thời gian lịch.
 - Gửi trùng: kiểm tra bảng `telegram_reminder_logs`; hệ thống có khóa chống trùng theo loại nhắc, đối tượng, giờ nhắc và chat id.
 - Callback bổ sung không nhận: kiểm tra webhook đang trỏ đúng `/telegram/webhook`, có `allowed_updates` gồm `callback_query`.
-- Lịch ăn không nhắc: kiểm tra `meal_plan_items.scheduled_time` đã có giờ cụ thể.
+- Không nhận gợi ý bữa tối: kiểm tra command `telegram:send-dinner-suggestions`, cron scheduler, trẻ active và `default_chat_id`.
 
 ## Gợi ý bữa tối lúc 14:00
 
@@ -174,10 +175,12 @@ Hệ thống có lệnh gửi gợi ý bữa tối hỗ trợ tiêu hóa qua Tel
 php artisan telegram:send-dinner-suggestions
 ```
 
-Lệnh này được scheduler chạy hằng ngày lúc 14:00:
+Lệnh này được scheduler chạy hằng ngày lúc 14:00 theo giờ Việt Nam:
 
 ```php
-Schedule::command('telegram:send-dinner-suggestions')->dailyAt('14:00');
+Schedule::command('telegram:send-dinner-suggestions')
+    ->timezone('Asia/Ho_Chi_Minh')
+    ->dailyAt('14:00');
 ```
 
 Production vẫn cần cron Laravel scheduler:
@@ -198,3 +201,53 @@ Nếu không nhận được gợi ý bữa tối:
 - Kiểm tra trẻ còn trạng thái `active`.
 - Kiểm tra bảng `telegram_meal_suggestion_logs` để xem trạng thái `sent`, `failed`, `prepared`.
 - Kiểm tra webhook có nhận callback `meal_suggestion:*` khi phụ huynh bấm nút.
+
+## Kiểm tra scheduler và demo Telegram
+
+Trang quản trị:
+
+```text
+/telegram
+```
+
+Mở khu vực `Kiểm tra lịch tự động` để test ngay các chức năng không cần chờ đúng giờ thật:
+
+- Tạo dữ liệu demo cho hôm nay
+- Gửi gợi ý bữa tối ngay
+- Gửi nhắc lịch tập ngay
+- Gửi gợi ý bữa tối ngay
+- Gửi nhắc lịch bổ sung ngay
+- Giả lập `/an`
+- Giả lập `/doimon`
+- Chạy thử `telegram:send-dinner-suggestions`
+- Chạy thử `telegram:send-due-reminders`
+
+Laravel scheduler chỉ tự chạy khi server đã có cron:
+
+```cron
+* * * * * cd /path/to/project && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Lệnh debug thủ công:
+
+```bash
+php artisan schedule:run
+php artisan telegram:send-dinner-suggestions
+php artisan telegram:send-due-reminders
+php artisan telegram:demo-today
+php artisan schedule:list
+```
+
+Bảng `scheduler_runs` ghi nhận lần chạy gần nhất của các command Telegram để kiểm tra cron có thật sự hoạt động hay không.
+
+Lỗi thường gặp:
+
+- Cron chưa cấu hình nên schedule không tự chạy.
+- `APP_URL` sai domain production.
+- Webhook chưa đăng ký hoặc đang trỏ sai URL.
+- Chưa có `chat_id` Telegram cho phụ huynh.
+- Trẻ không còn trạng thái `active`.
+- Không có lịch hôm nay hoặc lịch chưa có giờ cụ thể.
+- Tin đã gửi trong ngày nên cơ chế chống trùng bỏ qua.
+- Timezone server/app lệch với giờ mong muốn.
+- Queue worker chưa chạy nếu `QUEUE_CONNECTION` không phải `sync`.

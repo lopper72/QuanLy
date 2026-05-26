@@ -17,30 +17,10 @@ class TelegramMealSuggestionService
     private const SAFETY_NOTE = 'Nếu bé táo bón kéo dài, đau bụng nhiều, đi ngoài ra máu, nôn, sụt cân hoặc nhiều ngày không đi tiêu, cần liên hệ bác sĩ.';
 
     private const ALTERNATIVE_MENUS = [
-        [
-            'Cháo yến mạch mềm',
-            'Rau mồng tơi nấu thịt bằm',
-            'Khoai lang hấp',
-            'Đu đủ chín',
-        ],
-        [
-            'Cơm mềm',
-            'Canh bí đỏ',
-            'Cá hấp',
-            'Thanh long chín',
-        ],
-        [
-            'Cháo đậu xanh lượng nhỏ',
-            'Rau củ mềm',
-            'Trứng hấp',
-            'Chuối chín',
-        ],
-        [
-            'Súp khoai lang',
-            'Rau xanh nấu mềm',
-            'Thịt bằm mềm',
-            'Sữa chua không đường nếu bé dung nạp tốt',
-        ],
+        ['Cháo yến mạch mềm', 'Rau mồng tơi nấu thịt bằm', 'Khoai lang hấp', 'Đu đủ chín'],
+        ['Cơm mềm', 'Canh bí đỏ', 'Cá hấp', 'Thanh long chín'],
+        ['Cháo đậu xanh lượng nhỏ', 'Rau củ mềm', 'Trứng hấp', 'Chuối chín'],
+        ['Súp khoai lang', 'Rau xanh nấu mềm', 'Thịt bằm mềm', 'Sữa chua không đường nếu bé dung nạp tốt'],
     ];
 
     public function __construct(private readonly TelegramService $telegramService)
@@ -52,30 +32,27 @@ class TelegramMealSuggestionService
         $date ??= today();
         $result = ['children' => 0, 'sent' => 0, 'skipped' => 0, 'failed' => 0];
 
-        Child::active()
-            ->orderBy('full_name')
-            ->get()
-            ->each(function (Child $child) use ($date, &$result) {
-                $result['children']++;
-                $log = $this->sendDinnerSuggestionForChild($child, $date);
+        Child::active()->orderBy('full_name')->get()->each(function (Child $child) use ($date, &$result) {
+            $result['children']++;
+            $log = $this->sendDinnerSuggestionForChild($child, $date);
 
-                if (!$log) {
-                    $result['skipped']++;
-                    return;
-                }
-
-                if ($log->status === TelegramMealSuggestionLog::STATUS_SENT) {
-                    $result['sent']++;
-                    return;
-                }
-
-                if ($log->status === TelegramMealSuggestionLog::STATUS_FAILED) {
-                    $result['failed']++;
-                    return;
-                }
-
+            if (!$log) {
                 $result['skipped']++;
-            });
+                return;
+            }
+
+            if ($log->status === TelegramMealSuggestionLog::STATUS_SENT) {
+                $result['sent']++;
+                return;
+            }
+
+            if ($log->status === TelegramMealSuggestionLog::STATUS_FAILED) {
+                $result['failed']++;
+                return;
+            }
+
+            $result['skipped']++;
+        });
 
         return $result;
     }
@@ -117,15 +94,16 @@ class TelegramMealSuggestionService
             return $log;
         }
 
+        $keyboard = $this->suggestionKeyboard($child, $date);
         $message = $this->telegramService->logOutboundMessage((string) $chatId, $messageText, [
             'message_type' => 'meal_suggestion',
             'payload_json' => [
-                'reply_markup' => $this->suggestionKeyboard($child, $date),
+                'reply_markup' => $keyboard,
                 'meal_suggestion_log_id' => $log->id,
             ],
             'related_child_id' => $child->id,
         ]);
-        $response = $this->telegramService->deliverLoggedMessage($message, $this->suggestionKeyboard($child, $date));
+        $response = $this->telegramService->deliverLoggedMessage($message, $keyboard);
 
         $log->update([
             'message_text' => $messageText,
@@ -142,25 +120,25 @@ class TelegramMealSuggestionService
     public function buildDinnerSuggestionMessage(Child $child, Carbon $date): string
     {
         $items = $this->dinnerFoods($child, $date);
+        $dinnerTime = $this->dinnerTime($child, $date);
 
         return implode("\n", [
-            "🍽 Gợi ý bữa tối hôm nay cho bé {$child->full_name}",
+            "🍽 Gợi ý chuẩn bị bữa tối cho bé {$child->full_name}",
             '',
-            '🕒 Gửi lúc: 14:00',
+            '🕑 Gửi lúc: 14:00',
+            "🍲 Bữa tối dự kiến: {$dinnerTime}",
             '📅 Ngày: '.$date->format('d/m/Y'),
             '',
-            'Tối nay có thể thử:',
+            'Tối nay có thể chuẩn bị:',
             ...$this->numberedLines($items),
             '',
             '🎯 Mục tiêu:',
-            'Có thể hỗ trợ tiêu hóa, tăng nước và tạo thói quen ăn uống đều hơn nếu phù hợp với bé.',
+            'Hỗ trợ tiêu hóa, tăng nước và tạo thói quen ăn uống đều hơn nếu phù hợp với bé.',
             '',
-            '💡 Vì sao nên đổi món?',
-            'Thay đổi món nhẹ nhàng giúp bé:',
-            '- bớt nhàm chán',
-            '- tăng trải nghiệm vị giác',
-            '- làm quen món mới từng chút một',
-            '- hỗ trợ hệ tiêu hóa đa dạng hơn',
+            '💡 Vì sao gửi sớm?',
+            'Tin nhắn này được gửi lúc 14:00 để phụ huynh có thời gian chuẩn bị nguyên liệu và đổi món nếu cần.',
+            '',
+            'Bạn có thể bấm /doimon hoặc nút “Đổi món khác” nếu muốn gợi ý khác.',
             '',
             'Lưu ý:',
             self::SAFETY_NOTE,
@@ -206,7 +184,7 @@ class TelegramMealSuggestionService
         $menu = $this->suggestAlternativeDinner($child, $date);
 
         $this->telegramService->sendMessage($chatId, implode("\n", [
-            '🔁 Gợi ý món thay thế cho tối nay',
+            '🔁 Gợi ý món thay thế cho bữa tối hôm nay',
             '',
             "Bé: {$child->full_name}",
             '',
@@ -233,25 +211,22 @@ class TelegramMealSuggestionService
 
     public function buildTodayMealScheduleMessage(Child $child, Carbon $date): string
     {
-        $lines = [
+        $mealLines = $this->todayMealLines($child, $date);
+
+        return implode("\n", array_merge([
             "📋 Lịch ăn uống hôm nay của bé {$child->full_name}",
             '',
             '📅 Ngày: '.$date->format('d/m/Y'),
             '',
-            '14:00 - Nhận gợi ý bữa tối',
-        ];
-
-        $mealLines = $this->todayMealLines($child, $date);
-        array_push($lines, ...$mealLines);
-
-        $lines[] = '';
-        $lines[] = '20:30 - Gợi ý thói quen';
-        $lines[] = 'Cho bé ngồi toilet 5 phút sau bữa tối nếu phù hợp.';
-        $lines[] = '';
-        $lines[] = '💧 Nhắc uống nước:';
-        $lines[] = 'Chia nhỏ nước trong ngày, không ép uống quá nhiều một lúc.';
-
-        return implode("\n", $lines);
+            '14:00 - Gửi gợi ý chuẩn bị bữa tối',
+        ], $mealLines, [
+            '',
+            '20:30 - Theo dõi đi tiêu / thói quen sau ăn nếu phù hợp',
+            'Cho bé ngồi toilet 5 phút sau bữa tối nếu phù hợp.',
+            '',
+            '💧 Nhắc uống nước:',
+            'Chia nhỏ nước trong ngày, không ép uống quá nhiều một lúc.',
+        ]));
     }
 
     public function handleCallback(array $callback): ?TelegramMessage
@@ -325,7 +300,7 @@ class TelegramMealSuggestionService
     public function callbackFeedbackText(string $action): string
     {
         return match ($action) {
-            'change' => 'Đang gợi ý món khác',
+            'change' => 'Đang gửi gợi ý món khác',
             'view' => 'Đang mở lịch hôm nay',
             'prepared' => 'Đã ghi nhận chuẩn bị bữa tối',
             default => 'Đã ghi nhận phản hồi',
@@ -384,6 +359,13 @@ class TelegramMealSuggestionService
         $foods = collect($plan?->foods_json ?? [])->filter()->values()->all();
 
         return $foods !== [] ? $foods : self::ALTERNATIVE_MENUS[1];
+    }
+
+    private function dinnerTime(Child $child, Carbon $date): string
+    {
+        $plan = $this->getTodayDinnerPlan($child, $date);
+
+        return $plan?->scheduled_time ? substr((string) $plan->scheduled_time, 0, 5) : '18:00';
     }
 
     private function todayMealLines(Child $child, Carbon $date): array

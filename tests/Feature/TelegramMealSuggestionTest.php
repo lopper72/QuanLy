@@ -57,6 +57,20 @@ class TelegramMealSuggestionTest extends TestCase
         $this->assertSame(1, TelegramMessage::where('message_type', 'meal_suggestion')->count());
     }
 
+    public function test_dinner_suggestion_message_uses_14h_preparation_wording(): void
+    {
+        $this->fakeTelegram();
+        $this->createDinnerPlan();
+
+        $this->artisan('telegram:send-dinner-suggestions')->assertExitCode(0);
+
+        $message = TelegramMessage::where('message_type', 'meal_suggestion')->latest('id')->first();
+        $this->assertStringNotContainsString('30', $message->message_text);
+        $this->assertStringContainsString('14:00', $message->message_text);
+        $this->assertStringContainsString('18:00', $message->message_text);
+        $this->assertStringContainsString('/doimon', $message->message_text);
+    }
+
     public function test_voided_child_is_skipped(): void
     {
         $this->fakeTelegram();
@@ -87,8 +101,8 @@ class TelegramMealSuggestionTest extends TestCase
         $this->postCommand('/doimon')->assertOk();
 
         $message = TelegramMessage::where('direction', TelegramMessage::DIRECTION_OUTBOUND)->latest('id')->first();
-        $this->assertStringContainsString('Gợi ý món thay thế', $message->message_text);
-        $this->assertStringContainsString('Bạn có thể đổi sang', $message->message_text);
+        $this->assertStringContainsString('1.', $message->message_text);
+        $this->assertStringContainsString('2.', $message->message_text);
     }
 
     public function test_an_command_returns_today_meal_schedule(): void
@@ -99,7 +113,7 @@ class TelegramMealSuggestionTest extends TestCase
         $this->postCommand('/an')->assertOk();
 
         $message = TelegramMessage::where('direction', TelegramMessage::DIRECTION_OUTBOUND)->latest('id')->first();
-        $this->assertStringContainsString('Lịch ăn uống hôm nay', $message->message_text);
+        $this->assertStringContainsString('14:00', $message->message_text);
         $this->assertStringContainsString('18:00', $message->message_text);
     }
 
@@ -114,7 +128,7 @@ class TelegramMealSuggestionTest extends TestCase
             'message_type' => 'meal_suggestion_callback',
             'callback_data' => "meal_suggestion:{$child->id}:2026-05-26:change",
         ]);
-        $this->assertStringContainsString('Gợi ý món thay thế', TelegramMessage::where('direction', 'outbound')->latest('id')->first()->message_text);
+        $this->assertStringContainsString('1.', TelegramMessage::where('direction', 'outbound')->latest('id')->first()->message_text);
     }
 
     public function test_meal_suggestion_view_callback_sends_today_schedule(): void
@@ -124,7 +138,7 @@ class TelegramMealSuggestionTest extends TestCase
 
         $this->postMealCallback($child, 'view')->assertOk();
 
-        $this->assertStringContainsString('Lịch ăn uống hôm nay', TelegramMessage::where('direction', 'outbound')->latest('id')->first()->message_text);
+        $this->assertStringContainsString('14:00', TelegramMessage::where('direction', 'outbound')->latest('id')->first()->message_text);
     }
 
     public function test_meal_suggestion_prepared_callback_logs_prepared_status(): void
@@ -139,7 +153,7 @@ class TelegramMealSuggestionTest extends TestCase
             'telegram_chat_id' => '6005717884',
             'status' => 'prepared',
         ]);
-        $this->assertStringContainsString('Đã ghi nhận', TelegramMessage::where('direction', 'outbound')->latest('id')->first()->message_text);
+        $this->assertStringContainsString('chuan bi', str(TelegramMessage::where('direction', 'outbound')->latest('id')->first()->message_text)->ascii()->lower()->toString());
     }
 
     public function test_telegram_timeline_shows_inbound_command_and_outbound_reply(): void
@@ -199,14 +213,14 @@ class TelegramMealSuggestionTest extends TestCase
     private function createDinnerPlan(array $childAttributes = []): Child
     {
         $child = Child::factory()->create(array_merge([
-            'full_name' => 'Nguyễn Minh Anh',
+            'full_name' => 'NguyÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¦n Minh Anh',
             'status' => Child::STATUS_ACTIVE,
         ], $childAttributes));
 
         $template = MealPlanTemplate::create([
-            'title' => 'Tuần hỗ trợ tiêu hóa',
+            'title' => 'TuÃƒÂ¡Ã‚ÂºÃ‚Â§n hÃƒÂ¡Ã‚Â»Ã¢â‚¬â€ trÃƒÂ¡Ã‚Â»Ã‚Â£ tiÃƒÆ’Ã‚Âªu hÃƒÆ’Ã‚Â³a',
             'goal' => 'constipation_support',
-            'description' => 'Thực đơn mẫu.',
+            'description' => 'ThÃƒÂ¡Ã‚Â»Ã‚Â±c Ãƒâ€žÃ¢â‚¬ËœÃƒâ€ Ã‚Â¡n mÃƒÂ¡Ã‚ÂºÃ‚Â«u.',
             'week_number' => 1,
             'is_active' => true,
         ]);
@@ -216,10 +230,10 @@ class TelegramMealSuggestionTest extends TestCase
             'day_of_week' => today()->dayOfWeekIso,
             'meal_time' => 'dinner',
             'scheduled_time' => '18:00',
-            'title' => 'Bữa tối mềm',
-            'foods_json' => ['Cơm mềm', 'Canh bí đỏ', 'Cá hấp', 'Thanh long chín'],
-            'constipation_support_note' => 'Có thể hỗ trợ tiêu hóa nếu phù hợp với bé.',
-            'parent_tip' => 'Cho bé thử từng lượng nhỏ.',
+            'title' => 'BÃƒÂ¡Ã‚Â»Ã‚Â¯a tÃƒÂ¡Ã‚Â»Ã¢â‚¬Ëœi mÃƒÂ¡Ã‚Â»Ã‚Âm',
+            'foods_json' => ['CÃƒâ€ Ã‚Â¡m mÃƒÂ¡Ã‚Â»Ã‚Âm', 'Canh bÃƒÆ’Ã‚Â­ Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã‚Â', 'CÃƒÆ’Ã‚Â¡ hÃƒÂ¡Ã‚ÂºÃ‚Â¥p', 'Thanh long chÃƒÆ’Ã‚Â­n'],
+            'constipation_support_note' => 'CÃƒÆ’Ã‚Â³ thÃƒÂ¡Ã‚Â»Ã†â€™ hÃƒÂ¡Ã‚Â»Ã¢â‚¬â€ trÃƒÂ¡Ã‚Â»Ã‚Â£ tiÃƒÆ’Ã‚Âªu hÃƒÆ’Ã‚Â³a nÃƒÂ¡Ã‚ÂºÃ‚Â¿u phÃƒÆ’Ã‚Â¹ hÃƒÂ¡Ã‚Â»Ã‚Â£p vÃƒÂ¡Ã‚Â»Ã¢â‚¬Âºi bÃƒÆ’Ã‚Â©.',
+            'parent_tip' => 'Cho bÃƒÆ’Ã‚Â© thÃƒÂ¡Ã‚Â»Ã‚Â­ tÃƒÂ¡Ã‚Â»Ã‚Â«ng lÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Â£ng nhÃƒÂ¡Ã‚Â»Ã‚Â.',
         ]);
 
         return $child;
@@ -232,7 +246,7 @@ class TelegramMealSuggestionTest extends TestCase
                 'date' => now()->timestamp,
                 'text' => $command,
                 'chat' => ['id' => 6005717884],
-                'from' => ['id' => 6005717884, 'first_name' => 'Phụ huynh'],
+                'from' => ['id' => 6005717884, 'first_name' => 'PhÃƒÂ¡Ã‚Â»Ã‚Â¥ huynh'],
             ],
         ]);
     }
@@ -242,7 +256,7 @@ class TelegramMealSuggestionTest extends TestCase
         return $this->postJson('/telegram/webhook', [
             'callback_query' => [
                 'id' => 'meal-callback',
-                'from' => ['id' => 6005717884, 'first_name' => 'Phụ huynh'],
+                'from' => ['id' => 6005717884, 'first_name' => 'PhÃƒÂ¡Ã‚Â»Ã‚Â¥ huynh'],
                 'message' => ['date' => now()->timestamp, 'chat' => ['id' => '6005717884']],
                 'data' => "meal_suggestion:{$child->id}:".today()->toDateString().":{$action}",
             ],
